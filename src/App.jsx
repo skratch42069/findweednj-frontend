@@ -1,20 +1,20 @@
 import { useState, useMemo, useEffect } from "react";
 
-// ═══════════════════════════════════════════════════════════
-//  FINDWEEDNJ — Dashboard + Hidden Admin Panel
+// ===========================================================
+//  FINDWEEDNJ -- Dashboard + Hidden Admin Panel
 //  Admin: type "admin" anywhere or Ctrl+Shift+A
 //  Password: findweed420
-// ═══════════════════════════════════════════════════════════
+// ===========================================================
 
 const ADMIN_PASSWORD = "findweed420";
 const API_URL = "https://alluring-manifestation-production.up.railway.app";
 
-// ─── FEATURE FLAGS ────────────────────────────────────────────────────
+// --- FEATURE FLAGS ----------------------------------------------------
 // Set SHOW_PREDICTIONS to true once scraper has 30+ days of data (~May 13)
 const SHOW_PREDICTIONS = false;
 
 
-// ─── ADMIN DATA STORAGE ──────────────────────────────────────────────────
+// --- ADMIN DATA STORAGE --------------------------------------------------
 const ADMIN_STORAGE_KEY = "findweednj_analytics";
 
 function loadAdminData() {
@@ -28,7 +28,7 @@ function saveAdminData(d) {
   try { localStorage.setItem(ADMIN_STORAGE_KEY, JSON.stringify(d)); } catch {}
 }
 
-// ─── DEFAULT DATA ─────────────────────────────────────────────────────
+// --- DEFAULT DATA -----------------------------------------------------
 const DEFAULT_DATA = {
   businessGoal: 883,
   quitJobGoal: 6000,
@@ -43,13 +43,13 @@ const DEFAULT_DATA = {
     { id: "ca", name: "California", launched: false, launchMonth: 22, color: "#e07b6a", dispensaries: 800, targetSubs: 4500 },
   ],
   monthlyData: [
-    { month: 1, label: "Apr 2026", subs: { nj: 48  }, trials: 142, visitors: 890,  churnPct: 0,    dispPartners: 0, notes: "Reddit launch post — r/newjerseymarijuana" },
+    { month: 1, label: "Apr 2026", subs: { nj: 48  }, trials: 142, visitors: 890,  churnPct: 0,    dispPartners: 0, notes: "Reddit launch post -- r/newjerseymarijuana" },
   ],
   dispensaryPartners: [],
   milestones: [
     { id: 1, label: "First 100 NJ subscribers",    target: 100,   achieved: false, date: null },
     { id: 2, label: "Launch NY",                    target: null,  achieved: false, date: null },
-    { id: 3, label: "883 subs — quit job threshold",target: 883,   achieved: false, date: null },
+    { id: 3, label: "883 subs -- quit job threshold",target: 883,   achieved: false, date: null },
     { id: 4, label: "First dispensary partnership", target: null,  achieved: false, date: null },
     { id: 5, label: "2,000 total subscribers",      target: 2000,  achieved: false, date: null },
     { id: 6, label: "Launch MA",                    target: null,  achieved: false, date: null },
@@ -65,7 +65,7 @@ const DEFAULT_DATA = {
   },
 };
 
-// ─── HELPERS ──────────────────────────────────────────────────────────
+// --- HELPERS ----------------------------------------------------------
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 function formatCurrency(n) {
@@ -84,7 +84,7 @@ function calcRevenue(subs, revenuePerSub, infraCost, dispPartners) {
   return { gross, partnerRev, net };
 }
 
-// ─── SPARKLINE ────────────────────────────────────────────────────────
+// --- SPARKLINE --------------------------------------------------------
 function Sparkline({ data, color = "#6a9e6f", height = 40, width = 120 }) {
   if (!data || data.length < 2) return null;
   const max = Math.max(...data);
@@ -103,7 +103,7 @@ function Sparkline({ data, color = "#6a9e6f", height = 40, width = 120 }) {
   );
 }
 
-// ─── GAUGE ────────────────────────────────────────────────────────────
+// --- GAUGE ------------------------------------------------------------
 function Gauge({ value, max, color, label, sublabel }) {
   const pct = Math.min(value / max, 1);
   const angle = pct * 180;
@@ -128,7 +128,7 @@ function Gauge({ value, max, color, label, sublabel }) {
   );
 }
 
-// ─── MAIN APP ─────────────────────────────────────────────────────────
+// --- MAIN APP ---------------------------------------------------------
 function AdminPanel({ onClose }) {
   const [data, setData] = useState(() => loadAdminData() || DEFAULT_DATA);
   const [tab, setTab] = useState("dashboard");
@@ -141,7 +141,7 @@ function AdminPanel({ onClose }) {
 
   useEffect(() => { saveAdminData(data); }, [data]);
 
-  // ── Computed metrics ──────────────────────────────────────────────
+  // -- Computed metrics ----------------------------------------------
   const latestMonth = data.monthlyData[data.monthlyData.length - 1];
   const prevMonth = data.monthlyData[data.monthlyData.length - 2];
   const totalSubs = getTotalSubs(latestMonth);
@@ -174,7 +174,7 @@ function AdminPanel({ onClose }) {
     return 24;
   }, [totalSubs, data, activePartners, net]);
 
-  // ── Add month handler ─────────────────────────────────────────────
+  // -- Add month handler ---------------------------------------------
   function addMonth() {
     const entry = {
       month: data.monthlyData.length + 1,
@@ -195,7 +195,7 @@ function AdminPanel({ onClose }) {
     setShowAddMonth(false);
   }
 
-  // ── Add partner handler ───────────────────────────────────────────
+  // -- Add partner handler -------------------------------------------
   function addPartner() {
     const partner = {
       id: Date.now(),
@@ -208,7 +208,7 @@ function AdminPanel({ onClose }) {
     setShowAddPartner(false);
   }
 
-  // ── Toggle milestone ──────────────────────────────────────────────
+  // -- Toggle milestone ----------------------------------------------
   function toggleMilestone(id) {
     setData(d => ({
       ...d,
@@ -218,7 +218,7 @@ function AdminPanel({ onClose }) {
     }));
   }
 
-  // ── Update market ─────────────────────────────────────────────────
+  // -- Update market -------------------------------------------------
   function toggleMarket(id) {
     setData(d => ({
       ...d,
@@ -276,7 +276,7 @@ function AdminPanel({ onClose }) {
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <div style={{ fontSize: 12, color: "#9a9a8a" }}>Last updated: {latestMonth?.label || "—"}</div>
+                <div style={{ fontSize: 12, color: "#9a9a8a" }}>Last updated: {latestMonth?.label || "--"}</div>
                 <button className="btn" onClick={() => setShowAddMonth(true)} style={{ background: "linear-gradient(135deg,#6a9e6f,#3d6b42)", color: "#fff", fontSize: 12 }}>+ Log Month</button>
                 <button className="btn" onClick={onClose} style={{ background: "#fee2e2", color: "#e07b6a", fontSize: 12 }}>✕ Close Admin</button>
               </div>
@@ -292,7 +292,7 @@ function AdminPanel({ onClose }) {
 
       <div style={{ maxWidth: 1200, margin: "0 auto", padding: "24px" }}>
 
-        {/* ══ DASHBOARD ══ */}
+        {/* == DASHBOARD == */}
         {tab === "dashboard" && (
           <div className="fade">
 
@@ -304,7 +304,7 @@ function AdminPanel({ onClose }) {
                     Quit Job Progress
                   </div>
                   <div style={{ fontSize: 12, color: "#9a9a8a" }}>
-                    Goal: {formatCurrency(data.quitJobGoal)}/mo net · {data.businessGoal} subscribers needed
+                    Goal: {formatCurrency(data.quitJobGoal)}/mo net . {data.businessGoal} subscribers needed
                   </div>
                 </div>
                 <div style={{ textAlign: "right" }}>
@@ -443,7 +443,7 @@ function AdminPanel({ onClose }) {
           </div>
         )}
 
-        {/* ══ GROWTH ══ */}
+        {/* == GROWTH == */}
         {tab === "growth" && (
           <div className="fade">
             <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 22, fontWeight: 700, marginBottom: 6 }}>Growth Tracking</div>
@@ -462,7 +462,7 @@ function AdminPanel({ onClose }) {
                   {data.monthlyData.map((m, i) => {
                     const total = getTotalSubs(m);
                     const prevTotal = i > 0 ? getTotalSubs(data.monthlyData[i - 1]) : 0;
-                    const conv = m.trials > 0 ? ((total - prevTotal) / m.trials * 100).toFixed(0) : "—";
+                    const conv = m.trials > 0 ? ((total - prevTotal) / m.trials * 100).toFixed(0) : "--";
                     const { net: n } = calcRevenue(total, data.revenuePerSub, data.infraCost, m.dispPartners || 0);
                     const isLatest = i === data.monthlyData.length - 1;
                     return (
@@ -477,7 +477,7 @@ function AdminPanel({ onClose }) {
                         <td style={{ padding: "10px", textAlign: "right" }}>{conv}%</td>
                         <td style={{ padding: "10px", textAlign: "right", color: (m.churnPct || 0) > 5 ? "#e07b6a" : "#6a9e6f" }}>{m.churnPct || 0}%</td>
                         <td style={{ padding: "10px", textAlign: "right", fontWeight: 700, color: n >= 0 ? "#3d6b42" : "#e07b6a" }}>{formatCurrency(n)}</td>
-                        <td style={{ padding: "10px", color: "#9a9a8a", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.notes || "—"}</td>
+                        <td style={{ padding: "10px", color: "#9a9a8a", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{m.notes || "--"}</td>
                       </tr>
                     );
                   })}
@@ -516,7 +516,7 @@ function AdminPanel({ onClose }) {
           </div>
         )}
 
-        {/* ══ MARKETS ══ */}
+        {/* == MARKETS == */}
         {tab === "markets" && (
           <div className="fade">
             <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 22, fontWeight: 700, marginBottom: 6 }}>Market Expansion</div>
@@ -566,7 +566,7 @@ function AdminPanel({ onClose }) {
           </div>
         )}
 
-        {/* ══ SCRAPER ══ */}
+        {/* == SCRAPER == */}
         {tab === "scraper" && (
           <div className="fade">
             <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 22, fontWeight: 700, marginBottom: 6 }}>Scraper Health</div>
@@ -626,13 +626,13 @@ function AdminPanel({ onClose }) {
           </div>
         )}
 
-        {/* ══ PARTNERS ══ */}
+        {/* == PARTNERS == */}
         {tab === "partners" && (
           <div className="fade">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
               <div>
                 <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 22, fontWeight: 700, marginBottom: 4 }}>Dispensary Partners</div>
-                <div style={{ fontSize: 13, color: "#9a9a8a" }}>{activePartners} active · {formatCurrency(activePartners * 99)}/mo partner revenue</div>
+                <div style={{ fontSize: 13, color: "#9a9a8a" }}>{activePartners} active . {formatCurrency(activePartners * 99)}/mo partner revenue</div>
               </div>
               <button className="btn" onClick={() => setShowAddPartner(true)} style={{ background: "linear-gradient(135deg,#c8a96e,#e8b87a)", color: "#fff" }}>
                 + Add Partner
@@ -654,7 +654,7 @@ function AdminPanel({ onClose }) {
                   <div key={p.id} className="row" style={{ justifyContent: "space-between" }}>
                     <div>
                       <div style={{ fontWeight: 700, fontSize: 14 }}>{p.name}</div>
-                      <div style={{ fontSize: 11, color: "#9a9a8a" }}>{p.state.toUpperCase()} · Since {p.startDate || "—"} · {p.notes}</div>
+                      <div style={{ fontSize: 11, color: "#9a9a8a" }}>{p.state.toUpperCase()} . Since {p.startDate || "--"} . {p.notes}</div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                       <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 20, fontWeight: 700, color: "#c8a96e" }}>{formatCurrency(p.monthlyFee)}/mo</div>
@@ -671,7 +671,7 @@ function AdminPanel({ onClose }) {
           </div>
         )}
 
-        {/* ══ MILESTONES ══ */}
+        {/* == MILESTONES == */}
         {tab === "milestones" && (
           <div className="fade">
             <div style={{ fontFamily: "'Playfair Display',serif", fontSize: 22, fontWeight: 700, marginBottom: 6 }}>Milestones</div>
@@ -705,7 +705,7 @@ function AdminPanel({ onClose }) {
         )}
       </div>
 
-      {/* ── ADD MONTH MODAL ── */}
+      {/* -- ADD MONTH MODAL -- */}
       {showAddMonth && (
         <div className="modal-bg" onClick={e => e.target === e.currentTarget && setShowAddMonth(false)}>
           <div className="modal">
@@ -749,7 +749,7 @@ function AdminPanel({ onClose }) {
         </div>
       )}
 
-      {/* ── ADD PARTNER MODAL ── */}
+      {/* -- ADD PARTNER MODAL -- */}
       {showAddPartner && (
         <div className="modal-bg" onClick={e => e.target === e.currentTarget && setShowAddPartner(false)}>
           <div className="modal">
@@ -898,8 +898,6 @@ const MUNICIPAL_TAX = {
   // Warren County
   "Oxford":           0,
   "Phillipsburg":     0,
-  // Sussex County (via Warren)
-  "Wharton":          0,
 };
 
 const NJ_STATE_TAX = 0.06625;
@@ -1019,8 +1017,8 @@ const DEALS = [
   { dispensary:"quality-cannabliss", name:"35% Off Storewide", day:null, pct:35, applies_to:"storewide", stackable:false },
 ];
 
-// ─── SALE PREDICTION PATTERNS ────────────────────────────────────────
-// Sources: scraped history — patterns detected from repeated deal appearances in menu data
+// --- SALE PREDICTION PATTERNS ----------------------------------------
+// Sources: scraped history -- patterns detected from repeated deal appearances in menu data
 // confidence recalculates automatically as scraper accumulates observations
 // manually seeded with known patterns until scraper has 30+ days of data
 // confidence: 0-100 (how likely this pattern repeats)
@@ -1029,7 +1027,7 @@ const DEALS = [
 // last_seen: most recent confirmed occurrence
 
 const SALE_PATTERNS = [
-  // ── NAR Cannabis Mt Laurel ────────────────────────────────────────
+  // -- NAR Cannabis Mt Laurel ----------------------------------------
   { dispensary:"nar-cannabis-mt-laurel", name:"Saturday Storewide Sale",
     days:[6], frequency:"weekly", confidence:85, typical_discount:20,
     category:"storewide", last_seen:"2026-04-05",
@@ -1041,9 +1039,9 @@ const SALE_PATTERNS = [
   { dispensary:"nar-cannabis-mt-laurel", name:"Flash Brand Deal",
     days:[0,1,2,3,4,5,6], frequency:"irregular", confidence:60, typical_discount:25,
     category:"brand", last_seen:"2026-04-03",
-    source:"community", notes:"Random brand drops — Kind Tree, Cookies, Pyramid. Check daily." },
+    source:"community", notes:"Random brand drops -- Kind Tree, Cookies, Pyramid. Check daily." },
 
-  // ── Zen Leaf (all locations) ──────────────────────────────────────
+  // -- Zen Leaf (all locations) --------------------------------------
   { dispensary:"zen-leaf-mount-holly", name:"Mellow Monday Flower",
     days:[1], frequency:"weekly", confidence:90, typical_discount:20,
     category:"flower", last_seen:"2026-04-07",
@@ -1059,7 +1057,7 @@ const SALE_PATTERNS = [
     days:[1], frequency:"weekly", confidence:90, typical_discount:20,
     category:"flower", last_seen:"2026-04-07", source:"confirmed", notes:"" },
 
-  // ── RISE (all locations) ──────────────────────────────────────────
+  // -- RISE (all locations) ------------------------------------------
   { dispensary:"rise-bloomfield", name:"Flower Friday",
     days:[5], frequency:"weekly", confidence:92, typical_discount:20,
     category:"flower", last_seen:"2026-04-04",
@@ -1079,7 +1077,7 @@ const SALE_PATTERNS = [
     days:[5], frequency:"weekly", confidence:90, typical_discount:20,
     category:"flower", last_seen:"2026-04-04", source:"confirmed", notes:"" },
 
-  // ── Apothecarium ──────────────────────────────────────────────────
+  // -- Apothecarium --------------------------------------------------
   { dispensary:"apothecarium-maplewood", name:"Wax Wednesday",
     days:[3], frequency:"weekly", confidence:88, typical_discount:20,
     category:"concentrates", last_seen:"2026-04-02",
@@ -1093,7 +1091,7 @@ const SALE_PATTERNS = [
     category:"storewide", last_seen:"2026-03-28",
     source:"community", notes:"Unannounced Saturday deals, check their Instagram" },
 
-  // ── Earth and Ivy ─────────────────────────────────────────────────
+  // -- Earth and Ivy -------------------------------------------------
   { dispensary:"earth-and-ivy-new-brunswick", name:"Mary Jane Monday",
     days:[1], frequency:"weekly", confidence:90, typical_discount:25,
     category:"flower", last_seen:"2026-04-07", source:"confirmed", notes:"" },
@@ -1108,7 +1106,7 @@ const SALE_PATTERNS = [
     category:"storewide", last_seen:"2026-04-07",
     source:"confirmed", notes:"Mon-Thu 4-7pm" },
 
-  // ── Ascend ────────────────────────────────────────────────────────
+  // -- Ascend --------------------------------------------------------
   { dispensary:"ascend-rochelle-park", name:"Ozone Brand Day",
     days:[3], frequency:"weekly", confidence:75, typical_discount:20,
     category:"brand", brand:"Ozone", last_seen:"2026-04-02",
@@ -1118,7 +1116,7 @@ const SALE_PATTERNS = [
     category:"storewide", last_seen:"2026-03-28",
     source:"community", notes:"Fort Lee location runs weekend deals regularly" },
 
-  // ── HoneyGrove ────────────────────────────────────────────────────
+  // -- HoneyGrove ----------------------------------------------------
   { dispensary:"honeygrove-medford", name:"Hive Member Sale",
     days:[1], frequency:"weekly", confidence:80, typical_discount:25,
     category:"storewide", last_seen:"2026-04-07",
@@ -1128,35 +1126,35 @@ const SALE_PATTERNS = [
     category:"storewide", last_seen:"2026-03-29",
     source:"community", notes:"Unannounced Saturday sales, very common" },
 
-  // ── BluLight ─────────────────────────────────────────────────────
+  // -- BluLight -----------------------------------------------------
   { dispensary:"blulight-cannabis-linden", name:"Weekend Flash Sale",
     days:[5,6], frequency:"weekly", confidence:75, typical_discount:25,
     category:"storewide", last_seen:"2026-04-05",
     source:"community", notes:"BluLight known for aggressive weekend pricing" },
 
-  // ── Brotherly Bud ─────────────────────────────────────────────────
+  // -- Brotherly Bud -------------------------------------------------
   { dispensary:"brotherly-bud", name:"Weekend Deals",
     days:[5,6,0], frequency:"weekly", confidence:78, typical_discount:20,
     category:"storewide", last_seen:"2026-04-06",
-    source:"community", notes:"Small independent — runs deals most weekends" },
+    source:"community", notes:"Small independent -- runs deals most weekends" },
 
-  // ── Quality Cannabliss ────────────────────────────────────────────
+  // -- Quality Cannabliss --------------------------------------------
   { dispensary:"quality-cannabliss", name:"Daily Deal",
     days:[0,1,2,3,4,5,6], frequency:"weekly", confidence:85, typical_discount:35,
     category:"storewide", last_seen:"2026-04-06",
-    source:"confirmed", notes:"Always have a deal running — check daily" },
+    source:"confirmed", notes:"Always have a deal running -- check daily" },
 
-  // ── Curaleaf ─────────────────────────────────────────────────────
+  // -- Curaleaf -----------------------------------------------------
   { dispensary:"curaleaf-bellmawr", name:"Weekend Loyalty Deal",
     days:[5,6], frequency:"biweekly", confidence:60, typical_discount:15,
     category:"storewide", last_seen:"2026-03-28",
     source:"community", notes:"Curaleaf loyalty members get weekend extras" },
 
-  // ── Nirvana ───────────────────────────────────────────────────────
+  // -- Nirvana -------------------------------------------------------
   { dispensary:"nirvana-dispensary-mt-laurel", name:"Brand of the Week",
     days:[1], frequency:"weekly", confidence:72, typical_discount:20,
     category:"brand", last_seen:"2026-04-07",
-    source:"community", notes:"Monday brand feature rotates weekly — Full Tilt, Cookies, etc." },
+    source:"community", notes:"Monday brand feature rotates weekly -- Full Tilt, Cookies, etc." },
   { dispensary:"nirvana-dispensary-mt-laurel", name:"Saturday Sale",
     days:[6], frequency:"biweekly", confidence:68, typical_discount:20,
     category:"storewide", last_seen:"2026-03-29",
@@ -1327,7 +1325,7 @@ function getBestDeal(dispensarySlug, basePrice, options = {}) {
     else if (deal.applies_to === "brand_product" && brand && deal.brand === brand) applies = true;
     if (!applies) continue;
 
-    // Keep only the single highest discount — no stacking
+    // Keep only the single highest discount -- no stacking
     if (deal.pct && deal.pct > bestDiscount) {
       bestDiscount = deal.pct;
       bestDealName = deal.name;
@@ -1384,17 +1382,17 @@ function PricingModal({ onSelect, onClose, currentTier }) {
           <div style={{display:"flex",alignItems:"baseline",justifyContent:"center",gap:4,marginBottom:4}}>
             <span style={{fontFamily:"'Playfair Display',serif",fontSize:48,fontWeight:700,color:"#6a9e6f"}}>FREE</span>
           </div>
-          <div style={{fontSize:14,color:"#3d6b42",fontWeight:700,marginBottom:6}}>First month free — no credit card required</div>
+          <div style={{fontSize:14,color:"#3d6b42",fontWeight:700,marginBottom:6}}>First month free -- no credit card required</div>
           <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:10}}>
             <span style={{fontSize:13,color:"#9a9a8a",textDecoration:"line-through"}}>$6.99/mo</span>
             <span style={{fontSize:13,color:"#9a9a8a"}}>after May 13th</span>
           </div>
           <div style={{display:"inline-flex",background:"#ede9e0",borderRadius:20,padding:3,border:"1px solid #ddd8cc"}}>
-            {[["monthly","Monthly"],["annual","Annual · save 25%"]].map(([k,l])=>(
+            {[["monthly","Monthly"],["annual","Annual . save 25%"]].map(([k,l])=>(
               <button key={k} onClick={()=>setBilling(k)} style={{background:billing===k?"#fff":"transparent",border:"none",borderRadius:17,padding:"6px 16px",fontSize:12,fontWeight:billing===k?700:400,color:billing===k?"#3d6b42":"#9a9a8a",cursor:"pointer",fontFamily:"'Lato',sans-serif"}}>{l}</button>
             ))}
           </div>
-          {billing==="annual"&&<div style={{fontSize:12,color:"#3d6b42",fontWeight:700,marginTop:6}}>or $62.91/year after promo — save 25%</div>}
+          {billing==="annual"&&<div style={{fontSize:12,color:"#3d6b42",fontWeight:700,marginTop:6}}>or $62.91/year after promo -- save 25%</div>}
         </div>
         <button onClick={()=>onSelect("plus")} style={{width:"100%",padding:"14px",borderRadius:10,background:"linear-gradient(135deg,#3d6b42,#6a9e6f)",border:"none",color:"#fff",fontSize:15,fontWeight:700,cursor:"pointer",fontFamily:"'Lato',sans-serif",marginBottom:20,boxShadow:"0 4px 16px rgba(61,107,66,.3)"}}>
           🌿 Claim Free Month →
@@ -1402,13 +1400,13 @@ function PricingModal({ onSelect, onClose, currentTier }) {
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,marginBottom:20}}>
           {features.map(f=>(
             <div key={f.label} style={{display:"flex",alignItems:"center",gap:6,padding:"4px 0"}}>
-              <span style={{fontSize:13,color:f.plus?"#3d6b42":"#ddd",flexShrink:0}}>{f.plus?"✓":"–"}</span>
+              <span style={{fontSize:13,color:f.plus?"#3d6b42":"#ddd",flexShrink:0}}>{f.plus?"✓":"-"}</span>
               <span style={{fontSize:11,color:f.plus?"#5a5a5a":"#bbb"}}>{f.label}</span>
             </div>
           ))}
         </div>
         <div style={{textAlign:"center"}}>
-          <div style={{fontSize:11,color:"#9a9a8a",marginBottom:8}}>No credit card required · Free through May 13th · $6.99/mo after · Cancel anytime</div>
+          <div style={{fontSize:11,color:"#9a9a8a",marginBottom:8}}>No credit card required . Free through May 13th . $6.99/mo after . Cancel anytime</div>
           <button onClick={onClose} style={{background:"none",border:"none",color:"#9a9a8a",fontSize:12,cursor:"pointer",textDecoration:"underline",fontFamily:"'Lato',sans-serif"}}>Maybe later</button>
         </div>
       </div>
@@ -1448,7 +1446,7 @@ export default function App() {
   const [strainResults,  setStrainResults]= useState(null);
   const [strainLoading,  setStrainLoading]= useState(false);
 
-  // Live data from API — loaded via window globals set before React mounts
+  // Live data from API -- loaded via window globals set before React mounts
   const [liveProducts,   setLiveProducts] = useState(window.__LIVE_PRODUCTS__ || []);
   const [apiStatus,      setApiStatus]    = useState(window.__API_STATUS__ || "loading");
 
@@ -1500,7 +1498,7 @@ export default function App() {
   };
 
   const allRows = useMemo(() => {
-    // Live data only — no mock prices
+    // Live data only -- no mock prices
     if (liveProducts.length === 0) return [];
 
     const weightTarget = WEIGHTS.find(w => w.label === selectedWeight)?.grams;
@@ -1677,7 +1675,7 @@ export default function App() {
             <div style={{position:"sticky",top:100,display:"flex",flexDirection:"column",gap:10}}>
               <div className="card" style={{padding:18}}>
                 <div style={{fontSize:10,color:"#9a9a8a",letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:10,fontWeight:700}}>Filters</div>
-                <input className="inp" placeholder="Search dispensary…" value={dispSearch} onChange={e=>setDispSearch(e.target.value)} style={{marginBottom:8}}/>
+                <input className="inp" placeholder="Search dispensary..." value={dispSearch} onChange={e=>setDispSearch(e.target.value)} style={{marginBottom:8}}/>
                 <select className="inp" value={countyFilter} onChange={e=>setCountyFilter(e.target.value)} style={{marginBottom:8}}>
                   {COUNTIES.map(c=><option key={c} value={c}>{c==="All"?"All Counties":c+" County"}</option>)}
                 </select>
@@ -1738,7 +1736,7 @@ export default function App() {
                   <option value="final_desc">Final Price: High to Low</option>
                   <option value="discount">Biggest Discount</option>
                   <option value="tax">Lowest Tax Rate</option>
-                  <option value="name">Name A–Z</option>
+                  <option value="name">Name A-Z</option>
                 </select>
               </div>
             </div>
@@ -1748,15 +1746,15 @@ export default function App() {
                 <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
                   <div>
                     <div style={{fontFamily:"'Playfair Display',serif",fontSize:13,color:"#9a9a8a",marginBottom:2}}>
-                      {selectedWeight} · {selectedCat} · {DAYS[selectedDay]}{isFirstTime?" · First-time":""}{includeTax?" · with tax":""}{isMedical?" · Medical":""} 
+                      {selectedWeight} . {selectedCat} . {DAYS[selectedDay]}{isFirstTime?" . First-time":""}{includeTax?" . with tax":""}{isMedical?" . Medical":""} 
                     </div>
                     <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:700,color:"#3d6b42"}}>
                       {allRows.length > 0 ? (
-                        <>Best price: ${cheapest?.toFixed(2)??"—"}
+                        <>Best price: ${cheapest?.toFixed(2)??"--"}
                         <span style={{fontSize:13,color:"#9a9a8a",fontWeight:400,marginLeft:8}}>{allRows[0]?.name}</span></>
                       ) : (
                         <span style={{fontSize:16,color:"#9a9a8a"}}>
-                          {apiStatus==="loading"?"Loading live prices...":"Scraper running — check back soon"}
+                          {apiStatus==="loading"?"Loading live prices...":"Scraper running -- check back soon"}
                         </span>
                       )}
                     </div>
@@ -1783,7 +1781,7 @@ export default function App() {
                 <span style={{fontWeight:700,color:"#5a5a5a"}}>🔮 Sale predictions:</span>
                 <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,borderRadius:"50%",background:"#6a9e6f",display:"inline-block"}}/>Very likely (≥80%)</span>
                 <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,borderRadius:"50%",background:"#c8a96e",display:"inline-block"}}/>Possible (60-79%)</span>
-                <span style={{color:"#bbb"}}>Based on historical scraper data · Not guaranteed</span>
+                <span style={{color:"#bbb"}}>Based on historical scraper data . Not guaranteed</span>
               </div>
               )}
 
@@ -1798,24 +1796,11 @@ export default function App() {
                   <div style={{fontSize:13,color:"#9a9a8a",maxWidth:400,margin:"0 auto",lineHeight:1.6}}>
                     {apiStatus==="loading"
                       ? "Connecting to live NJ dispensary data. Should take just a moment."
-                      : "The scraper is collecting real-time prices from 97 NJ dispensaries. First run takes about 30 minutes. Check back soon — prices will appear here automatically."}
+                      : "The scraper is collecting real-time prices from 97 NJ dispensaries. First run takes about 30 minutes. Check back soon -- prices will appear here automatically."}
                   </div>
                 </div>
               )}
 
-              {allRows.length === 0 && (
-                <div style={{textAlign:"center",padding:"60px 20px",background:"#fff",borderRadius:16,border:"1.5px dashed #ddd8cc"}}>
-                  <div style={{fontSize:40,marginBottom:16}}>{apiStatus==="loading"?"⏳":"🌿"}</div>
-                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,marginBottom:8}}>
-                    {apiStatus==="loading"?"Loading live prices...":"Scraper warming up"}
-                  </div>
-                  <div style={{fontSize:13,color:"#9a9a8a",maxWidth:400,margin:"0 auto",lineHeight:1.6}}>
-                    {apiStatus==="loading"
-                      ? "Connecting to live NJ dispensary data..."
-                      : "The scraper is collecting real prices from 97 NJ dispensaries. First run takes ~30 minutes. Prices will appear here automatically."}
-                  </div>
-                </div>
-              )}
               {allRows.map((d,i)=>{
                 const best = i===0;
                 const barPct = allRows.length>1 ? Math.max(10,100-((d.finalPrice-cheapest)/(allRows[allRows.length-1].finalPrice-cheapest+0.01))*90) : 100;
@@ -1824,9 +1809,9 @@ export default function App() {
                     <div style={{width:22,fontFamily:"'Playfair Display',serif",fontSize:13,fontWeight:700,color:best?"#3d6b42":"#9a9a8a",textAlign:"right",flexShrink:0}}>#{i+1}</div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontSize:13,fontWeight:700,marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name}</div>
-                      {d.liveProductName&&<div style={{fontSize:11,color:"#3d6b42",fontWeight:700,marginBottom:1}}>📦 {d.liveProductName}{d.liveProductBrand?` — ${d.liveProductBrand}`:""}</div>}
-                      <div style={{fontSize:11,color:"#9a9a8a"}}>{d.city} · {d.county} Co.{d.isLiveData?" · ✓ Live":"" }</div>
-                      {d.bestDealName&&<div style={{fontSize:10,color:"#c8a96e",marginTop:3,fontWeight:700}}>🏷 Best deal: {d.bestDealName} — {d.bestDiscount}% off (discounts don't stack)</div>}
+                      {d.liveProductName&&<div style={{fontSize:11,color:"#3d6b42",fontWeight:700,marginBottom:1}}>📦 {d.liveProductName}{d.liveProductBrand?` -- ${d.liveProductBrand}`:""}</div>}
+                      <div style={{fontSize:11,color:"#9a9a8a"}}>{d.city} . {d.county} Co.{d.isLiveData?" . ✓ Live":"" }</div>
+                      {d.bestDealName&&<div style={{fontSize:10,color:"#c8a96e",marginTop:3,fontWeight:700}}>🏷 Best deal: {d.bestDealName} -- {d.bestDiscount}% off (discounts don't stack)</div>}
                       {SHOW_PREDICTIONS&&!d.bestDealName&&d.saleLikelihood&&d.saleLikelihood.confidence>=60&&(
                         <div style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:3,padding:"2px 8px",
                           background:d.saleLikelihood.confidence>=80?"#eef8f2":"#fdf3e3",
@@ -1948,7 +1933,7 @@ export default function App() {
                     <div key={d.slug} className="card" style={{padding:20,border:"1.5px solid "+(i===0?"#b8d4bb":"#ddd8cc"),background:i===0?"linear-gradient(135deg,#eef8f2,#fff)":"#fff"}}>
                       {i===0&&<div style={{fontSize:10,color:"#3d6b42",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>✦ BEST DEAL TODAY</div>}
                       <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,marginBottom:2}}>{d.name}</div>
-                      <div style={{fontSize:11,color:"#9a9a8a",marginBottom:10}}>{d.city} · {d.county} Co.</div>
+                      <div style={{fontSize:11,color:"#9a9a8a",marginBottom:10}}>{d.city} . {d.county} Co.</div>
                       <div style={{background:"#f7f5f0",borderRadius:8,padding:"12px 14px",marginBottom:10}}>
                         <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#5a5a5a",marginBottom:4}}>
                           <span>Base price</span><span>${d.basePrice.toFixed(2)}</span>
@@ -2033,7 +2018,7 @@ export default function App() {
                     <div style={{textAlign:"center",padding:"40px 20px",background:"#fff",borderRadius:16,border:"1.5px solid #ddd8cc"}}>
                       <div style={{fontSize:36,marginBottom:12}}>😔</div>
                       <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,marginBottom:6}}>Not in stock anywhere right now</div>
-                      <div style={{fontSize:13,color:"#9a9a8a"}}>Check back — menus update every 30 minutes.</div>
+                      <div style={{fontSize:13,color:"#9a9a8a"}}>Check back -- menus update every 30 minutes.</div>
                     </div>
                   ):(
                     <div style={{display:"flex",flexDirection:"column",gap:10}}>
@@ -2051,11 +2036,11 @@ export default function App() {
                                 <span style={{fontSize:11,padding:"2px 8px",background:r.category==="Flower"?"#eef8f2":"#f5f0fc",color:r.category==="Flower"?"#3d6b42":"#7b5ea7",borderRadius:20,fontWeight:700}}>{r.category}</span>
                                 {best&&<span style={{fontSize:10,padding:"2px 8px",background:"#3d6b42",color:"#fff",borderRadius:20,fontWeight:700}}>BEST PRICE</span>}
                               </div>
-                              <div style={{fontSize:12,color:"#9a9a8a",marginBottom:4}}>{r.city} · {r.county} Co. · {r.weight}</div>
+                              <div style={{fontSize:12,color:"#9a9a8a",marginBottom:4}}>{r.city} . {r.county} Co. . {r.weight}</div>
                               <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
                                 {r.thc&&<span style={{fontSize:11,color:"#5a5a5a",fontWeight:700}}>THC {r.thc}%</span>}
                                 {r.brand&&<span style={{fontSize:11,color:"#9a9a8a"}}>by {r.brand}</span>}
-                                {deal.bestDealName&&<span style={{fontSize:11,color:"#c8a96e",fontWeight:700}}>🏷 {deal.bestDealName} — {deal.bestDiscount}% off</span>}
+                                {deal.bestDealName&&<span style={{fontSize:11,color:"#c8a96e",fontWeight:700}}>🏷 {deal.bestDealName} -- {deal.bestDiscount}% off</span>}
                               </div>
                             </div>
                             <div style={{textAlign:"right",flexShrink:0,minWidth:100}}>
@@ -2079,7 +2064,7 @@ export default function App() {
           <div className="fade" style={{textAlign:"center",padding:"60px 20px"}}>
             <div style={{fontSize:40,marginBottom:16}}>🌱</div>
             <div style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:700,marginBottom:8}}>Strain Library</div>
-            <div style={{fontSize:13,color:"#9a9a8a",maxWidth:400,margin:"0 auto"}}>Full strain database with effects, terpenes, and where to find each strain in NJ. Coming soon — use Find a Strain in the meantime.</div>
+            <div style={{fontSize:13,color:"#9a9a8a",maxWidth:400,margin:"0 auto"}}>Full strain database with effects, terpenes, and where to find each strain in NJ. Coming soon -- use Find a Strain in the meantime.</div>
           </div>
         )}
 
