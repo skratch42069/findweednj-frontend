@@ -1451,25 +1451,28 @@ export default function App() {
   const [apiStatus,      setApiStatus]    = useState(window.__API_STATUS__ || "loading");
 
   useEffect(() => {
-    // If data already loaded by preloader, use it
-    if (window.__LIVE_PRODUCTS__ && window.__LIVE_PRODUCTS__.length > 0) {
-      setLiveProducts(window.__LIVE_PRODUCTS__);
-      setApiStatus("live");
-      return;
-    }
-    // Otherwise fetch now
+    console.log("FindWeedNJ: fetching prices from", API_URL);
     fetch(API_URL + "/prices")
-      .then(r => r.json())
+      .then(r => {
+        console.log("FindWeedNJ: response status", r.status);
+        return r.json();
+      })
       .then(data => {
+        console.log("FindWeedNJ: got data, length =", Array.isArray(data) ? data.length : "not array", data);
         if (Array.isArray(data) && data.length > 0) {
-          window.__LIVE_PRODUCTS__ = data;
-          setLiveProducts(data);
-          setApiStatus("live");
+          const clean = data.filter(p => p.price_usd && p.price_usd > 1);
+          console.log("FindWeedNJ: clean products =", clean.length);
+          setLiveProducts(clean);
+          setApiStatus(clean.length > 0 ? "live" : "empty");
         } else {
+          console.log("FindWeedNJ: no products returned");
           setApiStatus("empty");
         }
       })
-      .catch(() => setApiStatus("error"));
+      .catch(err => {
+        console.error("FindWeedNJ: fetch error", err);
+        setApiStatus("error");
+      });
   }, []);
 
   // Admin keyboard shortcut
