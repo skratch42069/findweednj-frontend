@@ -1803,19 +1803,6 @@ export default function App() {
                 </div>
               )}
 
-              {allRows.length === 0 && (
-                <div style={{textAlign:"center",padding:"60px 20px",background:"#fff",borderRadius:16,border:"1.5px dashed #ddd8cc"}}>
-                  <div style={{fontSize:40,marginBottom:16}}>{apiStatus==="loading"?"⏳":"🌿"}</div>
-                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,marginBottom:8}}>
-                    {apiStatus==="loading"?"Loading live prices...":"Scraper warming up"}
-                  </div>
-                  <div style={{fontSize:13,color:"#9a9a8a",maxWidth:400,margin:"0 auto",lineHeight:1.6}}>
-                    {apiStatus==="loading"
-                      ? "Connecting to live NJ dispensary data..."
-                      : "The scraper is collecting real prices from 97 NJ dispensaries. First run takes ~30 minutes. Prices will appear here automatically."}
-                  </div>
-                </div>
-              )}
               {allRows.map((d,i)=>{
                 const best = i===0;
                 const barPct = allRows.length>1 ? Math.max(10,100-((d.finalPrice-cheapest)/(allRows[allRows.length-1].finalPrice-cheapest+0.01))*90) : 100;
