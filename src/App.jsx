@@ -1522,9 +1522,17 @@ export default function App() {
       .map(([slug, products]) => {
         // Filter by category and weight
         let matching = products.filter(p => {
+          // Category match - also handle Weedmaps format like "{'id': 1, 'name': 'Indica'}"
+          const catStr = (p.category || "").toLowerCase();
           const catMatch = selectedCat === "All" ||
-            (p.category || "").toLowerCase().includes(selectedCat.toLowerCase());
-          const weightMatch = !weightTarget ||
+            catStr.includes(selectedCat.toLowerCase()) ||
+            (selectedCat === "Flower" && (catStr.includes("indica") || catStr.includes("sativa") || catStr.includes("hybrid") || catStr.includes("flower"))) ||
+            (selectedCat === "Pre-Rolls" && catStr.includes("pre")) ||
+            (selectedCat === "Vapes" && (catStr.includes("vape") || catStr.includes("cartridge"))) ||
+            (selectedCat === "Concentrates" && (catStr.includes("concentrate") || catStr.includes("wax") || catStr.includes("shatter"))) ||
+            (selectedCat === "Edibles" && catStr.includes("edible"));
+          // Weight match - if weight_grams is null, include it (scraper didn't capture weight)
+          const weightMatch = !weightTarget || p.weight_grams === null ||
             Math.abs((p.weight_grams || 0) - weightTarget) < 0.5;
           return catMatch && weightMatch;
         });
