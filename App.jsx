@@ -898,8 +898,6 @@ const MUNICIPAL_TAX = {
   // Warren County
   "Oxford":           0,
   "Phillipsburg":     0,
-  // Sussex County (via Warren)
-  "Wharton":          0,
 };
 
 const NJ_STATE_TAX = 0.06625;
