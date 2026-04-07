@@ -1464,7 +1464,7 @@ export default function App() {
           console.log("FindWeedNJ: first product sample =", JSON.stringify(data[0]));
           console.log("FindWeedNJ: price sample =", data[0]?.price_usd, typeof data[0]?.price_usd);
           // Accept all products with any positive price
-          const clean = data.filte.filter(p => p.price_usd)
+          const clean = data.filter(p => p.in_stock !== false);
           console.log("FindWeedNJ: clean products =", clean.length);
           setLiveProducts(clean);
           setApiStatus(clean.length > 0 ? "live" : "empty");
@@ -1530,8 +1530,9 @@ export default function App() {
         });
         if (matching.length === 0) return null;
 
-        const cheapest = matching.sort((a, b) => a.price_usd - b.price_usd)[0];
-        const basePrice = cheapest.price_usd;
+        // Sort by price, use first product. price_usd=1 means scraper placeholder
+        const cheapest = matching.sort((a, b) => (a.price_usd||99) - (b.price_usd||99))[0];
+        const basePrice = cheapest.price_usd || 0;
 
         const dispInfo = DISPENSARIES.find(d => d.slug === slug) || {
           slug, name: slug,
@@ -1837,17 +1838,20 @@ export default function App() {
                       </div>
                     </div>
                     <div style={{textAlign:"right",minWidth:80,flexShrink:0}}>
-                      {d.bestDiscount>0&&<div style={{fontSize:10,color:"#9a9a8a",textDecoration:"line-through"}}>${d.basePrice.toFixed(2)}</div>}
-                      {includeTax?(
-                        <>
-                          <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:700,color:best?"#3d6b42":"#2c2c2c",lineHeight:1}}>${d.finalPrice.toFixed(2)}</div>
-                          <div style={{fontSize:9,color:"#9a9a8a",marginTop:2}}>after tax</div>
-                          <div style={{fontSize:10,color:"#9a9a8a"}}>(${d.discountedPrice} + ${d.taxAmount.toFixed(2)} tax)</div>
-                        </>
+                      {d.basePrice>1&&d.bestDiscount>0&&<div style={{fontSize:10,color:"#9a9a8a",textDecoration:"line-through"}}>${d.basePrice.toFixed(2)}</div>}
+                      {d.basePrice>1?(
+                        includeTax?(
+                          <>
+                            <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:700,color:best?"#3d6b42":"#2c2c2c",lineHeight:1}}>${d.finalPrice.toFixed(2)}</div>
+                            <div style={{fontSize:9,color:"#9a9a8a",marginTop:2}}>after tax</div>
+                          </>
+                        ):(
+                          <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:700,color:best?"#3d6b42":"#2c2c2c",lineHeight:1}}>${d.discountedPrice}</div>
+                        )
                       ):(
-                        <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:700,color:best?"#3d6b42":"#2c2c2c",lineHeight:1}}>${d.discountedPrice}</div>
+                        <div style={{fontSize:11,color:"#c8a96e",fontWeight:700,marginTop:4}}>Price updating...</div>
                       )}
-                      <div style={{fontSize:9,color:"#9a9a8a"}}>{selectedWeight}</div>
+                      <div style={{fontSize:9,color:"#9a9a8a"}}>{d.productCount} products</div>
                     </div>
                   </div>
                 );
