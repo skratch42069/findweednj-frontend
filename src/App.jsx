@@ -1460,7 +1460,11 @@ export default function App() {
       .then(data => {
         console.log("FindWeedNJ: got data, length =", Array.isArray(data) ? data.length : "not array", data);
         if (Array.isArray(data) && data.length > 0) {
-          const clean = data.filter(p => p.price_usd && p.price_usd > 1);
+          // Log first product to see actual data structure
+          console.log("FindWeedNJ: first product sample =", JSON.stringify(data[0]));
+          console.log("FindWeedNJ: price sample =", data[0]?.price_usd, typeof data[0]?.price_usd);
+          // Accept all products with any positive price
+          const clean = data.filte.filter(p => p.price_usd)
           console.log("FindWeedNJ: clean products =", clean.length);
           setLiveProducts(clean);
           setApiStatus(clean.length > 0 ? "live" : "empty");
