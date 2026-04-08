@@ -1273,6 +1273,86 @@ function slugToName(slug) {
     .trim();
 }
 
+
+function cleanCategory(raw) {
+  if (!raw) return "Other";
+  const s = raw.toString().toLowerCase();
+  if (s.includes("flower") || s.includes("bud")) return "Flower";
+  if (s.includes("indica")) return "Indica";
+  if (s.includes("sativa")) return "Sativa";
+  if (s.includes("hybrid")) return "Hybrid";
+  if (s.includes("pre") || s.includes("joint") || s.includes("blunt")) return "Pre-Roll";
+  if (s.includes("vape") || s.includes("cartridge") || s.includes("cart") || s.includes("pod")) return "Vape";
+  if (s.includes("concentrate") || s.includes("wax") || s.includes("shatter") || s.includes("rosin") || s.includes("resin") || s.includes("hash") || s.includes("dab") || s.includes("extract")) return "Concentrate";
+  if (s.includes("edible") || s.includes("gummy") || s.includes("gummies") || s.includes("chocolate") || s.includes("candy") || s.includes("cookie") || s.includes("brownie") || s.includes("beverage") || s.includes("drink")) return "Edible";
+  if (s.includes("tincture") || s.includes("oil") || s.includes("rso")) return "Tincture";
+  if (s.includes("topical") || s.includes("cream") || s.includes("lotion") || s.includes("patch")) return "Topical";
+  if (s.includes("capsule") || s.includes("pill") || s.includes("tablet")) return "Capsule";
+  if (s.includes("accessory") || s.includes("gear") || s.includes("pipe") || s.includes("grinder")) return "Accessory";
+  return "Other";
+}
+
+function catColor(cat) {
+  const colors = {
+    "Indica": "#7b5ea7", "Sativa": "#c8a96e", "Hybrid": "#6a9e6f",
+    "Flower": "#6a9e6f", "Pre-Roll": "#4a8fb5", "Vape": "#e07b6a",
+    "Concentrate": "#9b72cf", "Edible": "#e8a87c", "Tincture": "#5a9ea0",
+    "Topical": "#a0c878", "Capsule": "#78a0c8", "Accessory": "#9a9a8a",
+    "Other": "#9a9a8a",
+  };
+  return colors[cat] || "#9a9a8a";
+}
+
+
+function strainToSlug(name) {
+  if (!name) return "";
+  return name.toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .trim();
+}
+
+function StrainImage({ name, imageUrl, size = 56, style = {} }) {
+  const [src, setSrc] = React.useState(
+    imageUrl && imageUrl.length > 5 ? imageUrl :
+    `https://cdn.leafly.com/strains/${strainToSlug(name)}.jpg`
+  );
+  const [failed, setFailed] = React.useState(false);
+
+  const fallbackColor = React.useMemo(() => {
+    const colors = ["#1e3a1e","#2a3a1a","#1a2e2e","#2e1a2e","#3a2a1a"];
+    let hash = 0;
+    for (let c of (name||"")) hash = c.charCodeAt(0) + ((hash<<5)-hash);
+    return colors[Math.abs(hash) % colors.length];
+  }, [name]);
+
+  if (failed) {
+    return (
+      <div style={{width:size,height:size,borderRadius:size>50?14:8,background:fallbackColor,
+        display:"flex",alignItems:"center",justifyContent:"center",fontSize:size>50?24:14,
+        flexShrink:0,...style}}>
+        🌿
+      </div>
+    );
+  }
+
+  return (
+    <img src={src} alt={name}
+      onError={()=>{
+        if (src.includes("leafly")) {
+          // Try alternate Leafly URL format
+          setSrc(`https://leafly-cms-production.imgix.net/strains/${strainToSlug(name)}.jpg`);
+        } else {
+          setFailed(true);
+        }
+      }}
+      style={{width:size,height:size,borderRadius:size>50?14:8,objectFit:"cover",
+        background:fallbackColor,flexShrink:0,...style}}
+    />
+  );
+}
+
 function getSaleLikelihood(dispensarySlug, dayOfWeek) {
   const patterns = SALE_PATTERNS.filter(p =>
     p.dispensary === dispensarySlug && p.days.includes(dayOfWeek)
@@ -1429,88 +1509,51 @@ function PricingModal({ onSelect, onClose, currentTier }) {
 
 
 export default function App() {
-  const [tier,           setTier]          = useState("plus");
-  const [showPricing,    setShowPricing]   = useState(false);
-  const [tab,            setTab]           = useState("compare");
-  const [showAdmin,      setShowAdmin]     = useState(false);
-  const [showAdminLogin, setShowAdminLogin]= useState(false);
-  const [adminPass,      setAdminPass]     = useState("");
-  const [adminErr,       setAdminErr]      = useState(false);
-  const [keyBuf,         setKeyBuf]        = useState("");
+  const [liveProducts,   setLiveProducts] = useState([]);
+  const [apiStatus,      setApiStatus]    = useState("loading");
+  const [tab,            setTab]          = useState("explore");
+  const [showPricing,    setShowPricing]  = useState(false);
+  const [showAdmin,      setShowAdmin]    = useState(false);
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
+  const [adminPass,      setAdminPass]    = useState("");
+  const [adminErr,       setAdminErr]     = useState(false);
+  const [keyBuf,         setKeyBuf]       = useState("");
+  const [tier,           setTier]         = useState("plus");
 
-  // Filters
-  const [selectedWeight, setSelectedWeight]= useState("3.5g");
-  const [selectedCat,    setSelectedCat]   = useState("Flower");
-  const [countyFilter,   setCountyFilter]  = useState("All");
-  const [dispSearch,     setDispSearch]    = useState("");
-  const [sortMode,       setSortMode]      = useState("final_asc");
+  // Optimizer state
+  const [optQuery,       setOptQuery]     = useState("");
+  const [optResults,     setOptResults]   = useState(null);
+  const [optLoading,     setOptLoading]   = useState(false);
+  const [optCategory,    setOptCategory]  = useState("All");
 
-  // Deal calculator
+  // Shared settings
   const [customerType,   setCustomerType] = useState("regular");
   const [isFirstTime,    setIsFirstTime]  = useState(false);
-  const [includeTax,     setIncludeTax]   = useState(true);
-  const [selectedDay,    setSelectedDay]  = useState(new Date().getDay());
-  const [currentHour,    setCurrentHour]  = useState(new Date().getHours());
   const [isMedical,      setIsMedical]    = useState(false);
+  const [selectedDay,    setSelectedDay]  = useState(new Date().getDay());
 
-  // Dispensary modal
+  // Explore state
+  const [exploreCategory, setExploreCategory] = useState("Flower");
+
+  // Selected dispensary modal
   const [selectedDisp,   setSelectedDisp] = useState(null);
   const [dispProducts,   setDispProducts] = useState([]);
-  const [dispModalOpen,  setDispModalOpen] = useState(false);
-  const [dispLoading,    setDispLoading]   = useState(false);
+  const [dispLoading,    setDispLoading]  = useState(false);
 
-  function openDispensary(row) {
-    setSelectedDisp(row);
-    setDispModalOpen(true);
-    setDispLoading(true);
-    fetch(API_URL + "/prices?dispensary=" + row.slug)
+  // Fetch live data
+  useEffect(() => {
+    fetch(API_URL + "/prices")
       .then(r => r.json())
       .then(data => {
-        setDispProducts(Array.isArray(data) ? data : []);
-        setDispLoading(false);
-      })
-      .catch(() => { setDispProducts([]); setDispLoading(false); });
-  }
-
-  // Strain finder
-  const [strainQuery,    setStrainQuery]  = useState("");
-  const [strainResults,  setStrainResults]= useState(null);
-  const [strainLoading,  setStrainLoading]= useState(false);
-
-  // Live data from API -- loaded via window globals set before React mounts
-  const [liveProducts,   setLiveProducts] = useState(window.__LIVE_PRODUCTS__ || []);
-  const [apiStatus,      setApiStatus]    = useState(window.__API_STATUS__ || "loading");
-
-  useEffect(() => {
-    console.log("FindWeedNJ: fetching prices from", API_URL);
-    fetch(API_URL + "/prices")
-      .then(r => {
-        console.log("FindWeedNJ: response status", r.status);
-        return r.json();
-      })
-      .then(data => {
-        console.log("FindWeedNJ: got data, length =", Array.isArray(data) ? data.length : "not array", data);
         if (Array.isArray(data) && data.length > 0) {
-          // Log first product to see actual data structure
-          console.log("FindWeedNJ: first product sample =", JSON.stringify(data[0]));
-          console.log("FindWeedNJ: price sample =", data[0]?.price_usd, typeof data[0]?.price_usd);
-          // Accept all products with any positive price
-          const clean = data.filter(p => p.in_stock !== false);
-          console.log("FindWeedNJ: clean products =", clean.length);
-          setLiveProducts(clean);
-          setApiStatus(clean.length > 0 ? "live" : "empty");
-        } else {
-          console.log("FindWeedNJ: no products returned");
-          setApiStatus("empty");
-        }
+          setLiveProducts(data.filter(p => p.in_stock !== false));
+          setApiStatus("live");
+        } else setApiStatus("empty");
       })
-      .catch(err => {
-        console.error("FindWeedNJ: fetch error", err);
-        setApiStatus("error");
-      });
+      .catch(() => setApiStatus("error"));
   }, []);
 
-  // Admin keyboard shortcut
+  // Admin shortcut
   useEffect(() => {
     const onKey = (e) => {
       if (e.ctrlKey && e.shiftKey && e.key === "A") { setShowAdminLogin(true); return; }
@@ -1524,374 +1567,394 @@ export default function App() {
 
   function doAdminLogin() {
     if (adminPass === ADMIN_PASSWORD) {
-      setShowAdmin(true); setShowAdminLogin(false);
-      setAdminPass(""); setAdminErr(false);
+      setShowAdmin(true); setShowAdminLogin(false); setAdminPass(""); setAdminErr(false);
     } else { setAdminErr(true); setAdminPass(""); }
   }
 
-  const perms = {
-    allDispensaries: true, allWeights: true, dealCalc: true,
-    taxCalc: true, countyFilter: true, strainLibrary: true,
-    priceHistory: false, alerts: false,
-  };
-
-  const allRows = useMemo(() => {
-    // Live data only -- no mock prices
-    if (liveProducts.length === 0) return [];
-
-    const weightTarget = WEIGHTS.find(w => w.label === selectedWeight)?.grams;
-
-    // Group products by dispensary
-    const byDispensary = {};
-    liveProducts.forEach(p => {
-      const slug = p.dispensary_slug;
-      if (!byDispensary[slug]) byDispensary[slug] = [];
-      byDispensary[slug].push(p);
-    });
-
-    return Object.entries(byDispensary)
-      .map(([slug, products]) => {
-        // Filter by category and weight
-        let matching = products.filter(p => {
-          // Category match - also handle Weedmaps format like "{'id': 1, 'name': 'Indica'}"
-          const catStr = (p.category || "").toLowerCase();
-          const catMatch = selectedCat === "All" ||
-            catStr.includes(selectedCat.toLowerCase()) ||
-            (selectedCat === "Flower" && (catStr.includes("indica") || catStr.includes("sativa") || catStr.includes("hybrid") || catStr.includes("flower"))) ||
-            (selectedCat === "Pre-Rolls" && catStr.includes("pre")) ||
-            (selectedCat === "Vapes" && (catStr.includes("vape") || catStr.includes("cartridge"))) ||
-            (selectedCat === "Concentrates" && (catStr.includes("concentrate") || catStr.includes("wax") || catStr.includes("shatter"))) ||
-            (selectedCat === "Edibles" && catStr.includes("edible"));
-          // Weight match - if weight_grams is null, include it (scraper didn't capture weight)
-          const weightMatch = !weightTarget || p.weight_grams === null ||
-            Math.abs((p.weight_grams || 0) - weightTarget) < 0.5;
-          return catMatch && weightMatch;
-        });
-        if (matching.length === 0) return null;
-
-        // Sort by price, use first product. price_usd=1 means scraper placeholder
-        const cheapest = matching.sort((a, b) => (a.price_usd||99) - (b.price_usd||99))[0];
-        const basePrice = cheapest.price_usd || 0;
-
-        const dispInfo = DISPENSARIES.find(d => d.slug === slug) || {
-          slug,
-          name: slugToName(slug),
-          city: cheapest.city || "",
-          county: cheapest.county || "",
-        };
-
-        if (countyFilter !== "All" && dispInfo.county !== countyFilter) return null;
-        if (dispSearch && !dispInfo.name.toLowerCase().includes(dispSearch.toLowerCase())) return null;
-
-        const { discountedPrice, bestDiscount, bestDealName } = getBestDeal(slug, basePrice, {
-          dayOfWeek: selectedDay,
-          customerType: isFirstTime ? "first-time" : customerType,
-          category: selectedCat, isFirstTime, currentHour,
-        });
-        const taxRate = getTaxRate(dispInfo.city, isMedical);
-        const taxAmount = Math.round(discountedPrice * taxRate * 100) / 100;
-        const finalPrice = Math.round(discountedPrice * (1 + taxRate) * 100) / 100;
-        const saleLikelihood = getSaleLikelihood(slug, selectedDay);
-
-        return {
-          ...dispInfo, basePrice, discountedPrice, bestDiscount, bestDealName,
-          taxRate, taxAmount, finalPrice, saleLikelihood,
-          productCount: products.length,
-          strainName: cheapest.name,
-          brand: cheapest.brand || "",
-          thc: cheapest.thc_pct,
-        };
-      })
-      .filter(Boolean)
-      .sort((a, b) => {
-        if (sortMode === "final_asc")  return a.finalPrice - b.finalPrice;
-        if (sortMode === "final_desc") return b.finalPrice - a.finalPrice;
-        if (sortMode === "discount")   return b.bestDiscount - a.bestDiscount;
-        if (sortMode === "tax")        return a.taxRate - b.taxRate;
-        return a.name.localeCompare(b.name);
-      });
-  }, [liveProducts, countyFilter, dispSearch, selectedWeight, selectedCat,
-      selectedDay, customerType, isFirstTime, currentHour, isMedical, sortMode]);
-
-  const cheapest = allRows[0]?.finalPrice;
-  const savings  = allRows.length > 1 ? (allRows[allRows.length-1].finalPrice - cheapest).toFixed(2) : 0;
-
-  const todayDeals = useMemo(() => {
-    return DEALS.filter(d => d.day === selectedDay && d.pct)
-      .map(d => ({ ...d, dispensaryName: DISPENSARIES.find(disp => disp.slug === d.dispensary)?.name || d.dispensary }))
-      .sort((a,b) => b.pct - a.pct);
-  }, [selectedDay]);
-
-  function doStrainSearch() {
-    if (strainQuery.trim().length < 2) return;
-    setStrainLoading(true);
-    fetch(`${API_URL}/strains/search?q=${encodeURIComponent(strainQuery)}`)
-      .then(r => r.json())
-      .then(data => {
-        if (Array.isArray(data) && data.length > 0) {
-          // Map API response to component format
-          const mapped = data.map(p => ({
-            dispensary: p.dispensary_slug,
-            city: p.city || "",
-            county: p.county || "",
-            slug: p.dispensary_slug,
-            strain: p.name,
-            brand: p.brand || "",
-            category: p.category || "Flower",
-            weight: p.weight_grams ? `${p.weight_grams}g` : "",
-            price: p.price_usd,
-            thc: p.thc_pct,
-            in_stock: p.in_stock,
-          }));
-          setStrainResults(mapped);
-        } else {
-          setStrainResults([]);
-        }
-        setStrainLoading(false);
-      })
-      .catch(() => {
-        setStrainResults([]);
-        setStrainLoading(false);
-      });
+  // PPG calculation
+  function calcPPG(price, weight_grams) {
+    if (!weight_grams || weight_grams <= 0 || !price || price <= 1) return null;
+    return price / weight_grams;
   }
 
+  // Apply best deal to a price
+  function applyDeal(slug, price, cat) {
+    const { discountedPrice, bestDiscount, bestDealName } = getBestDeal(slug, price, {
+      dayOfWeek: selectedDay,
+      customerType: isFirstTime ? "first-time" : customerType,
+      category: cat,
+      isFirstTime,
+    });
+    const taxRate = getTaxRate(
+      liveProducts.find(p => p.dispensary_slug === slug)?.city || "",
+      isMedical
+    );
+    const finalPrice = Math.round(discountedPrice * (1 + taxRate) * 100) / 100;
+    return { finalPrice, discountedPrice, bestDiscount, bestDealName, taxRate };
+  }
+
+  // Open dispensary modal
+  function openDispensary(slug, name) {
+    const dispInfo = DISPENSARIES.find(d => d.slug === slug) || {
+      slug, name: name || slugToName(slug),
+      city: liveProducts.find(p => p.dispensary_slug === slug)?.city || "",
+      county: liveProducts.find(p => p.dispensary_slug === slug)?.county || "",
+    };
+    setSelectedDisp(dispInfo);
+    setDispLoading(true);
+    fetch(API_URL + "/prices?dispensary=" + slug)
+      .then(r => r.json())
+      .then(data => { setDispProducts(Array.isArray(data) ? data : []); setDispLoading(false); })
+      .catch(() => { setDispProducts([]); setDispLoading(false); });
+  }
+
+  // ── OPTIMIZER: search by strain/product name ──
+  function runOptimizer() {
+    if (optQuery.trim().length < 2) return;
+    setOptLoading(true);
+    fetch(`${API_URL}/strains/search?q=${encodeURIComponent(optQuery)}`)
+      .then(r => r.json())
+      .then(rawData => {
+        if (!Array.isArray(rawData) || rawData.length === 0) {
+          setOptResults([]);
+          setOptLoading(false);
+          return;
+        }
+
+        // Filter by category if selected
+        let filtered = rawData;
+        if (optCategory !== "All") {
+          filtered = rawData.filter(p => {
+            const c = cleanCategory(p.category);
+            if (optCategory === "Flower") return ["Flower","Indica","Sativa","Hybrid"].includes(c);
+            return c === optCategory;
+          });
+          if (filtered.length === 0) filtered = rawData;
+        }
+
+        // Build result rows with PPG and final price
+        const rows = filtered.map(p => {
+          const price = p.price_usd > 1 ? p.price_usd : null;
+          const weight = p.weight_grams;
+          const { discountedPrice, bestDiscount, bestDealName, taxRate } = price
+            ? (() => {
+                const d = getBestDeal(p.dispensary_slug, price, {
+                  dayOfWeek: selectedDay,
+                  customerType: isFirstTime ? "first-time" : customerType,
+                  category: cleanCategory(p.category),
+                  isFirstTime,
+                });
+                const tx = getTaxRate(p.city || "", isMedical);
+                return { ...d, taxRate: tx };
+              })()
+            : { discountedPrice: null, bestDiscount: 0, bestDealName: null, taxRate: 0 };
+
+          const finalPrice = discountedPrice ? Math.round(discountedPrice * (1 + taxRate) * 100) / 100 : null;
+          const ppg = calcPPG(discountedPrice, weight);
+          const dispInfo = DISPENSARIES.find(d => d.slug === p.dispensary_slug) || {
+            name: slugToName(p.dispensary_slug),
+            city: p.city || "",
+            county: p.county || "",
+          };
+
+          return {
+            ...p,
+            dispName: dispInfo.name,
+            dispCity: dispInfo.city,
+            dispCounty: dispInfo.county,
+            finalPrice,
+            discountedPrice,
+            bestDiscount,
+            bestDealName,
+            taxRate,
+            ppg,
+            cleanCat: cleanCategory(p.category),
+          };
+        });
+
+        // Sort: products with PPG first (sorted by PPG), then by final price
+        rows.sort((a, b) => {
+          if (a.ppg && b.ppg) return a.ppg - b.ppg;
+          if (a.ppg) return -1;
+          if (b.ppg) return 1;
+          if (a.finalPrice && b.finalPrice) return a.finalPrice - b.finalPrice;
+          return 0;
+        });
+
+        setOptResults(rows);
+        setOptLoading(false);
+      })
+      .catch(() => { setOptResults([]); setOptLoading(false); });
+  }
+
+  // ── EXPLORE: best PPG deals by category ──
+  const exploreDeals = useMemo(() => {
+    if (liveProducts.length === 0) return [];
+
+    const EXPLORE_CATS = ["Flower","Pre-Rolls","Concentrates","Vapes","Edibles"];
+    const cat = exploreCategory;
+
+    // Filter to this category
+    const catProducts = liveProducts.filter(p => {
+      const c = cleanCategory(p.category);
+      if (cat === "Flower") return ["Flower","Indica","Sativa","Hybrid"].includes(c);
+      if (cat === "Pre-Rolls") return c === "Pre-Roll";
+      if (cat === "Concentrates") return c === "Concentrate";
+      if (cat === "Vapes") return c === "Vape";
+      if (cat === "Edibles") return c === "Edible";
+      return c === cat;
+    });
+
+    // Group by dispensary, find best PPG product per dispensary
+    const byDisp = {};
+    catProducts.forEach(p => {
+      const slug = p.dispensary_slug;
+      if (!byDisp[slug]) byDisp[slug] = [];
+      byDisp[slug].push(p);
+    });
+
+    return Object.entries(byDisp).map(([slug, products]) => {
+      const dispInfo = DISPENSARIES.find(d => d.slug === slug) || {
+        slug, name: slugToName(slug),
+        city: products[0]?.city || "",
+        county: products[0]?.county || "",
+      };
+
+      // Find best PPG product (after discount)
+      let bestPPGProduct = null;
+      let bestPPG = Infinity;
+
+      products.forEach(p => {
+        if (!p.price_usd || p.price_usd <= 1 || !p.weight_grams) return;
+        const { discountedPrice } = getBestDeal(slug, p.price_usd, {
+          dayOfWeek: selectedDay,
+          customerType: isFirstTime ? "first-time" : customerType,
+          category: cleanCategory(p.category),
+          isFirstTime,
+        });
+        const taxRate = getTaxRate(dispInfo.city, isMedical);
+        const finalPrice = discountedPrice * (1 + taxRate);
+        const ppg = finalPrice / p.weight_grams;
+        if (ppg < bestPPG) {
+          bestPPG = ppg;
+          bestPPGProduct = { ...p, finalPrice: Math.round(finalPrice * 100) / 100, ppg: Math.round(ppg * 100) / 100 };
+        }
+      });
+
+      // Get deal info for display
+      const samplePrice = products.find(p => p.price_usd > 1)?.price_usd;
+      const dealInfo = samplePrice ? getBestDeal(slug, samplePrice, {
+        dayOfWeek: selectedDay,
+        customerType: isFirstTime ? "first-time" : customerType,
+        category: cat,
+        isFirstTime,
+      }) : { bestDiscount: 0, bestDealName: null };
+
+      const firstTimePct = DEALS.find(d => d.dispensary === slug && d.firstTimeOnly)?.pct || 0;
+
+      return {
+        ...dispInfo,
+        bestPPGProduct,
+        bestPPG: bestPPGProduct ? bestPPG : null,
+        productCount: products.length,
+        hasRealPrices: products.some(p => p.price_usd > 1),
+        bestDiscount: dealInfo.bestDiscount,
+        bestDealName: dealInfo.bestDealName,
+        firstTimePct,
+      };
+    })
+    .sort((a, b) => {
+      // Sort by PPG if available, then by discount
+      if (a.bestPPG && b.bestPPG) return a.bestPPG - b.bestPPG;
+      if (a.bestPPG) return -1;
+      if (b.bestPPG) return 1;
+      return b.bestDiscount - a.bestDiscount;
+    });
+  }, [liveProducts, exploreCategory, selectedDay, customerType, isFirstTime, isMedical]);
+
+  const EXPLORE_CATS = ["Flower","Pre-Rolls","Concentrates","Vapes","Edibles"];
+  const OPT_CATS = ["All","Flower","Pre-Rolls","Concentrates","Vapes","Edibles"];
+
   return (
-    <div style={{minHeight:"100vh",background:"#f7f5f0",fontFamily:"'Lato',sans-serif",color:"#2c2c2c"}}>
+    <div style={{minHeight:"100vh",background:"#0d1a0d",fontFamily:"'DM Sans',sans-serif",color:"#f0ede6",maxWidth:600,margin:"0 auto"}}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Lato:wght@300;400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&family=DM+Serif+Display:ital@0;1&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
-        .inp{background:#fff;border:1.5px solid #ddd8cc;color:#2c2c2c;padding:9px 14px;font-family:'Lato',sans-serif;font-size:13px;border-radius:8px;outline:none;width:100%;transition:border .2s}
-        .inp:focus{border-color:#6a9e6f;box-shadow:0 0 0 3px rgba(106,158,111,.12)}
-        .card{background:#fff;border:1px solid #ddd8cc;border-radius:12px;box-shadow:0 2px 16px rgba(0,0,0,.06)}
-        .tab-btn{background:none;border:none;color:#9a9a8a;cursor:pointer;padding:10px 18px;font-family:'Lato',sans-serif;font-size:13px;border-bottom:2px solid transparent;transition:all .2s}
-        .tab-btn.on{color:#3d6b42;border-bottom-color:#6a9e6f;font-weight:700}
-        .prow{display:flex;align-items:center;gap:12px;padding:14px 18px;background:#fff;border:1.5px solid #ddd8cc;border-radius:10px;margin-bottom:6px;cursor:pointer;transition:all .15s}
-        .prow:hover{border-color:#b8d4bb;box-shadow:0 4px 16px rgba(0,0,0,.08);transform:translateY(-1px)}
-        .prow.best{background:linear-gradient(135deg,#eef8f0,#fff);border-color:#b8d4bb}
-        .cbx{display:flex;align-items:flex-start;gap:10px;cursor:pointer;padding:12px;border-radius:10px;border:1.5px solid #ddd8cc;background:#fff;transition:all .15s;margin-bottom:8px}
-        .cbx:hover{border-color:#b8d4bb;background:#eef8f2}
-        .cbx.on{border-color:#6a9e6f;background:#eef8f2}
-        .live-dot{width:8px;height:8px;border-radius:50%;background:#6a9e6f;animation:pulse 2s infinite;display:inline-block}
-        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-        .fade{animation:fi .3s ease}@keyframes fi{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-        .sel-btn{background:#fff;border:1.5px solid #ddd8cc;color:#5a5a5a;cursor:pointer;padding:7px 14px;font-family:'Lato',sans-serif;font-size:12px;border-radius:20px;transition:all .15s;white-space:nowrap}
-        .sel-btn:hover{border-color:#6a9e6f;color:#3d6b42}
-        .sel-btn.on{background:#6a9e6f;border-color:#6a9e6f;color:#fff;font-weight:700}
-        .upgrade-btn{border:none;border-radius:8px;padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer;font-family:'Lato',sans-serif;transition:all .15s}
-        .upgrade-btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,.15)}
-        .prog-bar{height:8px;background:#e8f2e8;border-radius:4px;overflow:hidden}
-        .prog-fill{height:100%;border-radius:4px;transition:width .6s}
+        ::-webkit-scrollbar{width:0;height:0}
+        body{background:#0d1a0d}
+        .pill{display:inline-flex;align-items:center;padding:7px 16px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;border:none;transition:all .18s;white-space:nowrap;font-family:'DM Sans',sans-serif}
+        .pill.on{background:#c8f53c;color:#0d1a0d}
+        .pill.off{background:rgba(255,255,255,.07);color:rgba(240,237,230,.55)}
+        .pill.off:hover{background:rgba(255,255,255,.13);color:rgba(240,237,230,.9)}
+        .card{background:#162016;border:1px solid rgba(200,245,60,.1);border-radius:18px;cursor:pointer;transition:all .22s}
+        .card:hover{border-color:rgba(200,245,60,.3);box-shadow:0 8px 32px rgba(0,0,0,.35)}
+        .card:active{transform:scale(.98)}
+        .inp{background:rgba(255,255,255,.06);border:1.5px solid rgba(255,255,255,.1);color:#f0ede6;padding:14px 18px;font-family:'DM Sans',sans-serif;font-size:15px;border-radius:14px;outline:none;width:100%;transition:all .2s}
+        .inp:focus{border-color:#c8f53c;background:rgba(200,245,60,.05)}
+        .inp::placeholder{color:rgba(240,237,230,.3)}
+        .shimmer{background:linear-gradient(90deg,#162016 25%,#1e2e1e 50%,#162016 75%);background-size:200% 100%;animation:shimmer 1.4s infinite}
+        @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+        .fade{animation:fi .25s ease}@keyframes fi{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+        .slide{animation:su .3s cubic-bezier(.32,.72,0,1)}@keyframes su{from{transform:translateY(100%)}to{transform:none}}
+        select option{background:#162016;color:#f0ede6}
+        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
       `}</style>
 
       {/* HEADER */}
-      <header style={{background:"#fff",borderBottom:"1px solid #ddd8cc",padding:"0 28px",position:"sticky",top:0,zIndex:50,boxShadow:"0 1px 12px rgba(0,0,0,.05)"}}>
-        <div style={{maxWidth:1300,margin:"0 auto"}}>
-          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"14px 0 8px"}}>
-            <div style={{display:"flex",alignItems:"center",gap:12}}>
-              <div style={{fontSize:28,lineHeight:1}}>🔍</div>
-              <div>
-                <div style={{fontFamily:"'Playfair Display',serif",fontSize:21,fontWeight:700,color:"#3d6b42",lineHeight:1}}>FindWeedNJ</div>
-                <div style={{fontSize:9,color:"#9a9a8a",letterSpacing:"2px",textTransform:"uppercase",marginTop:1}}>NJ Dispensary Price Intelligence</div>
-              </div>
-            </div>
-            <div style={{display:"flex",alignItems:"center",gap:14}}>
-              <div style={{display:"flex",alignItems:"center",gap:6}}>
-                <div className="live-dot" style={{background:apiStatus==="live"?"#6a9e6f":apiStatus==="error"?"#e07b6a":"#c8a96e"}}/>
-                <span style={{fontSize:11,color:apiStatus==="live"?"#3d6b42":apiStatus==="error"?"#e07b6a":"#c8a96e",fontWeight:700,letterSpacing:"1px"}}>
-                  {apiStatus==="live"?"LIVE":apiStatus==="error"?"OFFLINE":"LOADING"}
-                </span>
-              </div>
-              <div style={{fontSize:11,color:"#3d6b42",padding:"4px 12px",background:"#eef8f2",borderRadius:20,border:"1px solid #b8d4bb",fontWeight:700}}>✓ FindWeedNJ+ Active</div>
-              <button className="upgrade-btn" onClick={()=>setShowPricing(true)} style={{background:"linear-gradient(135deg,#3d6b42,#6a9e6f)",color:"#fff"}}>
-                🌿 4/20 Free Month →
-              </button>
+      <header style={{padding:"18px 20px 0",position:"sticky",top:0,background:"#0d1a0d",zIndex:50}}>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:14}}>
+          <div style={{display:"flex",alignItems:"center",gap:10}}>
+            <div style={{width:36,height:36,borderRadius:"50%",background:"linear-gradient(135deg,#c8f53c,#7ab52a)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🌿</div>
+            <div>
+              <div style={{fontFamily:"'DM Serif Display',serif",fontSize:22,color:"#c8f53c",lineHeight:1}}>FindWeedNJ</div>
+              <div style={{fontSize:10,color:"rgba(200,245,60,.4)",letterSpacing:"2px",textTransform:"uppercase",marginTop:1}}>Price Intelligence</div>
             </div>
           </div>
-          <div style={{display:"flex",gap:0}}>
-            {[["compare","💰 Price Compare"],["deals","🏷 Today's Deals"],["calculator","🧮 Deal Calculator"],["finder","🔍 Find a Strain"],["strains","🌱 Strain Library"]].map(([k,l])=>(
-              <button key={k} className={"tab-btn"+(tab===k?" on":"")} onClick={()=>setTab(k)}>{l}</button>
-            ))}
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <div style={{display:"flex",alignItems:"center",gap:5,padding:"5px 11px",background:"rgba(200,245,60,.07)",borderRadius:20,border:"1px solid rgba(200,245,60,.15)"}}>
+              <div style={{width:6,height:6,borderRadius:"50%",background:apiStatus==="live"?"#c8f53c":"#c8a96e",animation:apiStatus==="live"?"pulse 2s infinite":"none"}}/>
+              <span style={{fontSize:11,fontWeight:600,color:apiStatus==="live"?"#c8f53c":"rgba(240,237,230,.4)"}}>{apiStatus==="live"?"LIVE":"..."}</span>
+            </div>
+            <button onClick={()=>setShowPricing(true)} style={{background:"#c8f53c",border:"none",borderRadius:20,padding:"7px 16px",fontSize:12,fontWeight:700,color:"#0d1a0d",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>
+              Free Month
+            </button>
           </div>
+        </div>
+
+        {/* Tab switcher */}
+        <div style={{display:"flex",background:"rgba(255,255,255,.05)",borderRadius:14,padding:4,marginBottom:0}}>
+          {[["explore","🏷 Explore Deals"],["optimizer","🎯 Price Optimizer"]].map(([t,l])=>(
+            <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"10px",borderRadius:10,border:"none",background:tab===t?"#c8f53c":"transparent",color:tab===t?"#0d1a0d":"rgba(240,237,230,.45)",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",transition:"all .2s"}}>
+              {l}
+            </button>
+          ))}
         </div>
       </header>
 
-      <div style={{maxWidth:1300,margin:"0 auto",padding:"24px 28px"}}>
+      <div style={{padding:"16px 16px 100px"}}>
 
-        {/* COMPARE TAB */}
-        {tab==="compare"&&(
-          <div className="fade" style={{display:"grid",gridTemplateColumns:"300px 1fr",gap:24,alignItems:"start"}}>
-            <div style={{position:"sticky",top:100,display:"flex",flexDirection:"column",gap:10}}>
-              <div className="card" style={{padding:18}}>
-                <div style={{fontSize:10,color:"#9a9a8a",letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:10,fontWeight:700}}>Filters</div>
-                <input className="inp" placeholder="Search dispensary..." value={dispSearch} onChange={e=>setDispSearch(e.target.value)} style={{marginBottom:8}}/>
-                <select className="inp" value={countyFilter} onChange={e=>setCountyFilter(e.target.value)} style={{marginBottom:8}}>
-                  {COUNTIES.map(c=><option key={c} value={c}>{c==="All"?"All Counties":c+" County"}</option>)}
-                </select>
-                <div style={{fontSize:10,color:"#9a9a8a",letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:6}}>Category</div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:10}}>
-                  {CATEGORIES.map(c=><button key={c} className={"sel-btn"+(selectedCat===c?" on":"")} onClick={()=>setSelectedCat(c)} style={{fontSize:11,padding:"5px 10px"}}>{c}</button>)}
-                </div>
-                <div style={{fontSize:10,color:"#9a9a8a",letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:6}}>Weight</div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
-                  {WEIGHTS.map(w=><button key={w.label} className={"sel-btn"+(selectedWeight===w.label?" on":"")} onClick={()=>setSelectedWeight(w.label)} style={{fontSize:11,padding:"5px 10px"}}>{w.label}</button>)}
-                </div>
+        {/* ═══════════════════════════════════════════
+            EXPLORE TAB
+        ═══════════════════════════════════════════ */}
+        {tab==="explore"&&(
+          <div className="fade">
+
+            {/* Settings row */}
+            <div style={{display:"flex",gap:8,marginBottom:16,alignItems:"center"}}>
+              <select className="inp" value={customerType} onChange={e=>setCustomerType(e.target.value)}
+                style={{padding:"9px 12px",fontSize:12,flex:1}}>
+                {CUSTOMER_TYPES.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
+              </select>
+              <button onClick={()=>setIsFirstTime(v=>!v)} style={{padding:"9px 14px",borderRadius:10,border:"1.5px solid "+(isFirstTime?"#c8f53c":"rgba(255,255,255,.12)"),background:isFirstTime?"rgba(200,245,60,.1)":"transparent",color:isFirstTime?"#c8f53c":"rgba(240,237,230,.4)",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",whiteSpace:"nowrap"}}>
+                {isFirstTime?"✓ 1st":"1st?"}
+              </button>
+              <button onClick={()=>setIsMedical(v=>!v)} style={{padding:"9px 14px",borderRadius:10,border:"1.5px solid "+(isMedical?"#c8f53c":"rgba(255,255,255,.12)"),background:isMedical?"rgba(200,245,60,.1)":"transparent",color:isMedical?"#c8f53c":"rgba(240,237,230,.4)",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",whiteSpace:"nowrap"}}>
+                {isMedical?"✓ Med":"Med?"}
+              </button>
+            </div>
+
+            {/* Day selector */}
+            <div style={{display:"flex",gap:5,overflowX:"auto",marginBottom:16,paddingBottom:2}}>
+              {DAYS.map((d,i)=>(
+                <button key={i} className={"pill"+(selectedDay===i?" on":" off")} onClick={()=>setSelectedDay(i)} style={{fontSize:11,padding:"5px 11px"}}>
+                  {d.slice(0,3)}{i===new Date().getDay()?" •":""}
+                </button>
+              ))}
+            </div>
+
+            {/* Category selector */}
+            <div style={{display:"flex",gap:6,overflowX:"auto",marginBottom:20,paddingBottom:2}}>
+              {EXPLORE_CATS.map(c=>(
+                <button key={c} className={"pill"+(exploreCategory===c?" on":" off")} onClick={()=>setExploreCategory(c)}>{c}</button>
+              ))}
+            </div>
+
+            {/* Section header */}
+            <div style={{marginBottom:14}}>
+              <div style={{fontFamily:"'DM Serif Display',serif",fontSize:24,color:"#f0ede6",lineHeight:1.1}}>
+                Best <span style={{color:"#c8f53c"}}>{exploreCategory}</span><br/>deals in NJ
               </div>
-              <div className="card" style={{padding:18}}>
-                <div style={{fontSize:10,color:"#9a9a8a",letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:10,fontWeight:700}}>Deal Calculator</div>
-                <div style={{fontSize:11,color:"#5a5a5a",marginBottom:4}}>Shopping day</div>
-                <select className="inp" value={selectedDay} onChange={e=>setSelectedDay(parseInt(e.target.value))} style={{marginBottom:8}}>
-                  {DAYS.map((d,i)=><option key={i} value={i}>{d}{i===new Date().getDay()?" (Today)":""}</option>)}
-                </select>
-                <div style={{fontSize:11,color:"#5a5a5a",marginBottom:4}}>Customer type</div>
-                <select className="inp" value={customerType} onChange={e=>setCustomerType(e.target.value)} style={{marginBottom:8}}>
-                  {CUSTOMER_TYPES.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
-                </select>
-                <div className={"cbx"+(isFirstTime?" on":"")} onClick={()=>setIsFirstTime(v=>!v)}>
-                  <div style={{width:18,height:18,borderRadius:4,border:"2px solid "+(isFirstTime?"#6a9e6f":"#ddd8cc"),background:isFirstTime?"#6a9e6f":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    {isFirstTime&&<span style={{color:"#fff",fontSize:11}}>✓</span>}
-                  </div>
-                  <div>
-                    <div style={{fontSize:12,fontWeight:700,color:isFirstTime?"#3d6b42":"#2c2c2c"}}>First-time customer</div>
-                    <div style={{fontSize:10,color:"#9a9a8a",marginTop:1}}>Apply first-time discounts</div>
-                  </div>
-                </div>
-              </div>
-              <div className="card" style={{padding:18}}>
-                <div style={{fontSize:10,color:"#9a9a8a",letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:10,fontWeight:700}}>Tax Calculator</div>
-                <div className={"cbx"+(includeTax?" on":"")} onClick={()=>setIncludeTax(v=>!v)}>
-                  <div style={{width:18,height:18,borderRadius:4,border:"2px solid "+(includeTax?"#6a9e6f":"#ddd8cc"),background:includeTax?"#6a9e6f":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    {includeTax&&<span style={{color:"#fff",fontSize:11}}>✓</span>}
-                  </div>
-                  <div>
-                    <div style={{fontSize:12,fontWeight:700}}>Include NJ tax</div>
-                    <div style={{fontSize:10,color:"#9a9a8a"}}>Shows real out-of-pocket cost</div>
-                  </div>
-                </div>
-                <div className={"cbx"+(isMedical?" on":"")} onClick={()=>setIsMedical(v=>!v)}>
-                  <div style={{width:18,height:18,borderRadius:4,border:"2px solid "+(isMedical?"#6a9e6f":"#ddd8cc"),background:isMedical?"#6a9e6f":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    {isMedical&&<span style={{color:"#fff",fontSize:11}}>✓</span>}
-                  </div>
-                  <div>
-                    <div style={{fontSize:12,fontWeight:700}}>Medical patient</div>
-                    <div style={{fontSize:10,color:"#9a9a8a"}}>Tax-exempt since July 2022</div>
-                  </div>
-                </div>
-              </div>
-              <div className="card" style={{padding:18}}>
-                <div style={{fontSize:10,color:"#9a9a8a",letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:8,fontWeight:700}}>Sort By</div>
-                <select className="inp" value={sortMode} onChange={e=>setSortMode(e.target.value)}>
-                  <option value="final_asc">Final Price: Low to High</option>
-                  <option value="final_desc">Final Price: High to Low</option>
-                  <option value="discount">Biggest Discount</option>
-                  <option value="tax">Lowest Tax Rate</option>
-                  <option value="name">Name A-Z</option>
-                </select>
+              <div style={{fontSize:12,color:"rgba(240,237,230,.35)",marginTop:6}}>
+                Ranked by price per gram · {exploreDeals.filter(d=>d.bestPPG).length} with live pricing
               </div>
             </div>
 
-            <div>
-              <div className="card fade" style={{padding:"16px 22px",marginBottom:18,background:"linear-gradient(135deg,#eef8f2,#fff)",borderColor:"#b8d4bb"}}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",flexWrap:"wrap",gap:12}}>
-                  <div>
-                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:13,color:"#9a9a8a",marginBottom:2}}>
-                      {selectedWeight} . {selectedCat} . {DAYS[selectedDay]}{isFirstTime?" . First-time":""}{includeTax?" . with tax":""}{isMedical?" . Medical":""} 
-                    </div>
-                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:700,color:"#3d6b42"}}>
-                      {allRows.length > 0 ? (
-                        <>Best price: ${cheapest?.toFixed(2)??"--"}
-                        <span style={{fontSize:13,color:"#9a9a8a",fontWeight:400,marginLeft:8}}>{allRows[0]?.name}</span></>
-                      ) : (
-                        <span style={{fontSize:16,color:"#9a9a8a"}}>
-                          {apiStatus==="loading"?"Loading live prices...":"Scraper running -- check back soon"}
-                        </span>
-                      )}
-                    </div>
-                    {savings>0&&<div style={{fontSize:12,color:"#c8a96e",marginTop:2,fontWeight:700}}>Save up to ${savings} vs most expensive</div>}
-                  </div>
-                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
-                    {[
-                      {l:"In Stock",v:allRows.length,c:"#3d6b42"},
-                      {l:"Deals Today",v:allRows.filter(r=>r.bestDiscount>0).length,c:"#c8a96e"},
-                      {l:"Avg Discount",v:`${Math.round(allRows.filter(r=>r.bestDiscount>0).reduce((s,r)=>s+r.bestDiscount,0)/(allRows.filter(r=>r.bestDiscount>0).length||1))}%`,c:"#7b5ea7"},
-                    ].map(({l,v,c})=>(
-                      <div key={l} style={{padding:"10px 12px",background:"#fff",borderRadius:8,border:"1px solid #ddd8cc",textAlign:"center"}}>
-                        <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:c}}>{v}</div>
-                        <div style={{fontSize:9,color:"#9a9a8a",textTransform:"uppercase",letterSpacing:"1px",marginTop:2}}>{l}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+            {/* Loading */}
+            {apiStatus==="loading"&&(
+              <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                {[1,2,3,4].map(i=><div key={i} className="shimmer" style={{height:110,borderRadius:18}}/>)}
               </div>
+            )}
 
-              {/* Sale prediction legend - hidden until SHOW_PREDICTIONS=true */}
-              {SHOW_PREDICTIONS&&(
-              <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:12,padding:"8px 14px",background:"#fff",borderRadius:8,border:"1px solid #ddd8cc",fontSize:11,color:"#9a9a8a",flexWrap:"wrap"}}>
-                <span style={{fontWeight:700,color:"#5a5a5a"}}>🔮 Sale predictions:</span>
-                <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,borderRadius:"50%",background:"#6a9e6f",display:"inline-block"}}/>Very likely (≥80%)</span>
-                <span style={{display:"flex",alignItems:"center",gap:4}}><span style={{width:8,height:8,borderRadius:"50%",background:"#c8a96e",display:"inline-block"}}/>Possible (60-79%)</span>
-                <span style={{color:"#bbb"}}>Based on historical scraper data . Not guaranteed</span>
-              </div>
-              )}
-
-              {allRows.length === 0 && (
-                <div style={{textAlign:"center",padding:"60px 20px",background:"#fff",borderRadius:16,border:"1.5px dashed #ddd8cc"}}>
-                  <div style={{fontSize:40,marginBottom:16}}>
-                    {apiStatus==="loading"?"⏳":"🌿"}
-                  </div>
-                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,marginBottom:8,color:"#2c2c2c"}}>
-                    {apiStatus==="loading"?"Loading live dispensary prices...":"Scraper warming up"}
-                  </div>
-                  <div style={{fontSize:13,color:"#9a9a8a",maxWidth:400,margin:"0 auto",lineHeight:1.6}}>
-                    {apiStatus==="loading"
-                      ? "Connecting to live NJ dispensary data. Should take just a moment."
-                      : "The scraper is collecting real-time prices from 97 NJ dispensaries. First run takes about 30 minutes. Check back soon -- prices will appear here automatically."}
-                  </div>
-                </div>
-              )}
-
-              {allRows.map((d,i)=>{
-                const best = i===0;
-                const barPct = allRows.length>1 ? Math.max(10,100-((d.finalPrice-cheapest)/(allRows[allRows.length-1].finalPrice-cheapest+0.01))*90) : 100;
+            {/* Deal cards */}
+            <div style={{display:"flex",flexDirection:"column",gap:8}}>
+              {exploreDeals.map((d,i)=>{
+                const isTop = i < 3;
+                const hasPPG = d.bestPPG !== null;
                 return (
-                  <div key={d.slug} className={"prow"+(best?" best":"")} onClick={()=>openDispensary(d)}>
-                    <div style={{width:22,fontFamily:"'Playfair Display',serif",fontSize:13,fontWeight:700,color:best?"#3d6b42":"#9a9a8a",textAlign:"right",flexShrink:0}}>#{i+1}</div>
-                    <div style={{flex:1,minWidth:0}}>
-                      <div style={{fontSize:13,fontWeight:700,marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name}</div>
-                      {d.liveProductName&&<div style={{fontSize:11,color:"#3d6b42",fontWeight:700,marginBottom:1}}>📦 {d.liveProductName}{d.liveProductBrand?` -- ${d.liveProductBrand}`:""}</div>}
-                      <div style={{fontSize:11,color:"#9a9a8a"}}>{d.city} . {d.county} Co.{d.isLiveData?" . ✓ Live":"" }</div>
-                      {d.bestDealName&&<div style={{fontSize:10,color:"#c8a96e",marginTop:3,fontWeight:700}}>🏷 Best deal: {d.bestDealName} -- {d.bestDiscount}% off (discounts don't stack)</div>}
-                      {SHOW_PREDICTIONS&&!d.bestDealName&&d.saleLikelihood&&d.saleLikelihood.confidence>=60&&(
-                        <div style={{display:"inline-flex",alignItems:"center",gap:4,marginTop:3,padding:"2px 8px",
-                          background:d.saleLikelihood.confidence>=80?"#eef8f2":"#fdf3e3",
-                          border:"1px solid "+(d.saleLikelihood.confidence>=80?"#b8d4bb":"#e8c87a"),
-                          borderRadius:20,fontSize:10,fontWeight:700,
-                          color:d.saleLikelihood.confidence>=80?"#3d6b42":"#c8a96e"}}>
-                          🔮 {d.saleLikelihood.confidence>=80?"Sale very likely":"Sale possible"} today
-                          {d.saleLikelihood.typical_discount&&` (~${d.saleLikelihood.typical_discount}% off)`}
+                  <div key={d.slug} className="card" onClick={()=>openDispensary(d.slug, d.name)}
+                    style={{padding:"16px 18px",borderColor:i===0?"rgba(200,245,60,.35)":isTop?"rgba(200,245,60,.15)":"rgba(200,245,60,.07)",
+                      background:i===0?"linear-gradient(135deg,#1c3010,#162016)":isTop?"linear-gradient(135deg,#192b12,#162016)":"#162016"}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",gap:12}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        {/* Top product image */}
+                        {d.bestPPGProduct&&(
+                          <div style={{float:"right",marginLeft:10,marginBottom:6}}>
+                            <StrainImage
+                              name={d.bestPPGProduct.name}
+                              imageUrl={d.bestPPGProduct.image_url}
+                              size={64}
+                            />
+                          </div>
+                        )}
+                        {/* Rank + badges */}
+                        <div style={{display:"flex",alignItems:"center",gap:6,marginBottom:6}}>
+                          <span style={{fontFamily:"'DM Serif Display',serif",fontSize:13,color:i===0?"#c8f53c":"rgba(240,237,230,.3)",fontWeight:400}}>#{i+1}</span>
+                          {i===0&&<span style={{fontSize:10,padding:"2px 8px",background:"#c8f53c",color:"#0d1a0d",borderRadius:20,fontWeight:700}}>BEST VALUE</span>}
+                          {d.bestDiscount>0&&<span style={{fontSize:10,padding:"2px 8px",background:"rgba(200,245,60,.12)",color:"#c8f53c",borderRadius:20,fontWeight:700,border:"1px solid rgba(200,245,60,.2)"}}>-{d.bestDiscount}% today</span>}
+                          {d.firstTimePct>0&&!isFirstTime&&<span style={{fontSize:10,padding:"2px 8px",background:"rgba(255,255,255,.06)",color:"rgba(240,237,230,.5)",borderRadius:20,fontWeight:600}}>🆕 {d.firstTimePct}% 1st visit</span>}
                         </div>
-                      )}
-                      {includeTax&&<div style={{fontSize:10,color:"#9a9a8a",marginTop:2}}>📍 {getTaxLabel(d.city,isMedical)}</div>}
-                    </div>
-                    <div style={{width:120,flexShrink:0}}>
-                      <div style={{height:4,background:"#e8f2e8",borderRadius:4}}>
-                        <div style={{height:4,width:`${barPct}%`,background:"linear-gradient(90deg,#6a9e6f,#b8d4bb)",borderRadius:4}}/>
+                        <div style={{fontFamily:"'DM Serif Display',serif",fontSize:18,color:"#f0ede6",marginBottom:3,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{d.name}</div>
+                        <div style={{fontSize:12,color:"rgba(240,237,230,.4)"}}>{d.city} · {d.county} Co.</div>
+                        {d.bestPPGProduct&&(
+                          <div style={{fontSize:11,color:"rgba(240,237,230,.35)",marginTop:4,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                            e.g. {d.bestPPGProduct.name?.slice(0,40)}{d.bestPPGProduct.name?.length>40?"...":""}
+                          </div>
+                        )}
+                        {d.bestDealName&&(
+                          <div style={{fontSize:11,color:"rgba(200,245,60,.55)",marginTop:5,fontWeight:600}}>🏷 {d.bestDealName}</div>
+                        )}
+                      </div>
+
+                      {/* PPG / price display */}
+                      <div style={{textAlign:"right",flexShrink:0,minWidth:80}}>
+                        {hasPPG?(
+                          <div>
+                            <div style={{fontFamily:"'DM Serif Display',serif",fontSize:28,color:i===0?"#c8f53c":"#f0ede6",lineHeight:1}}>${d.bestPPG.toFixed(2)}</div>
+                            <div style={{fontSize:10,color:"rgba(240,237,230,.4)",marginTop:2,fontWeight:600}}>/gram</div>
+                            {d.bestPPGProduct?.weight_grams&&(
+                              <div style={{fontSize:10,color:"rgba(240,237,230,.3)",marginTop:1}}>{d.bestPPGProduct.weight_grams}g · ${d.bestPPGProduct.finalPrice}</div>
+                            )}
+                          </div>
+                        ):(
+                          <div>
+                            {d.bestDiscount>0?(
+                              <div>
+                                <div style={{fontFamily:"'DM Serif Display',serif",fontSize:28,color:"#c8f53c",lineHeight:1}}>{d.bestDiscount}%</div>
+                                <div style={{fontSize:10,color:"rgba(200,245,60,.5)",fontWeight:600}}>OFF</div>
+                              </div>
+                            ):(
+                              <div style={{fontSize:12,color:"rgba(240,237,230,.25)",marginTop:4}}>{d.productCount} products</div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <div style={{textAlign:"right",minWidth:80,flexShrink:0}}>
-                      {d.basePrice>1&&d.bestDiscount>0&&<div style={{fontSize:10,color:"#9a9a8a",textDecoration:"line-through"}}>${d.basePrice.toFixed(2)}</div>}
-                      {d.basePrice>1?(
-                        includeTax?(
-                          <>
-                            <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:700,color:best?"#3d6b42":"#2c2c2c",lineHeight:1}}>${d.finalPrice.toFixed(2)}</div>
-                            <div style={{fontSize:9,color:"#9a9a8a",marginTop:2}}>after tax</div>
-                          </>
-                        ):(
-                          <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:700,color:best?"#3d6b42":"#2c2c2c",lineHeight:1}}>${d.discountedPrice}</div>
-                        )
-                      ):(
-                        <div style={{fontSize:11,color:"#c8a96e",fontWeight:700,marginTop:4}}>Price updating...</div>
-                      )}
-                      <div style={{fontSize:9,color:"#9a9a8a"}}>{d.productCount} products</div>
+
+                    {/* Bottom strip */}
+                    <div style={{marginTop:10,paddingTop:8,borderTop:"1px solid rgba(255,255,255,.05)",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <span style={{fontSize:11,color:"rgba(240,237,230,.25)"}}>📍 {getTaxLabel(d.city, isMedical)}</span>
+                      <span style={{fontSize:11,color:"rgba(200,245,60,.4)",fontWeight:600}}>View menu →</span>
                     </div>
                   </div>
                 );
@@ -1900,318 +1963,262 @@ export default function App() {
           </div>
         )}
 
-        {/* DEALS TAB */}
-        {tab==="deals"&&(
+        {/* ═══════════════════════════════════════════
+            PRICE OPTIMIZER TAB
+        ═══════════════════════════════════════════ */}
+        {tab==="optimizer"&&(
           <div className="fade">
-            <div style={{marginBottom:20}}>
-              <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:700,marginBottom:4}}>{DAYS[selectedDay]}'s Deals</div>
-              <div style={{fontSize:13,color:"#9a9a8a",marginBottom:12}}>{todayDeals.length} active deals across NJ today</div>
-              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-                {DAYS.map((d,i)=>(
-                  <button key={i} className={"sel-btn"+(selectedDay===i?" on":"")} onClick={()=>setSelectedDay(i)} style={{fontSize:11,padding:"5px 12px"}}>
-                    {d}{i===new Date().getDay()?" ★":""}
-                  </button>
-                ))}
+
+            <div style={{padding:"8px 0 20px"}}>
+              <div style={{fontFamily:"'DM Serif Display',serif",fontSize:26,color:"#f0ede6",marginBottom:4,lineHeight:1.2}}>
+                Find the <span style={{color:"#c8f53c"}}>best price</span><br/>on any product
+              </div>
+              <div style={{fontSize:13,color:"rgba(240,237,230,.35)"}}>
+                Search by strain or product name · ranked by price per gram
               </div>
             </div>
-            {todayDeals.length===0?(
-              <div style={{textAlign:"center",padding:60,color:"#9a9a8a"}}>No specific deals logged for {DAYS[selectedDay]}.</div>
-            ):(
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(280px,1fr))",gap:14}}>
-                {todayDeals.map((deal,i)=>(
-                  <div key={i} className="card" style={{padding:20}}>
-                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
-                      <div style={{flex:1,paddingRight:10}}>
-                        <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,marginBottom:3}}>{deal.dispensaryName}</div>
-                        <div style={{fontSize:12,fontWeight:700,color:"#3d6b42"}}>{deal.name}</div>
-                        {deal.applies_to==="category"&&<div style={{fontSize:11,color:"#9a9a8a",marginTop:2}}>📦 {deal.category} only</div>}
-                        {deal.applies_to==="brand"&&<div style={{fontSize:11,color:"#9a9a8a",marginTop:2}}>🏷 {deal.brand} brand</div>}
-                        {deal.notes&&<div style={{fontSize:11,color:"#9a9a8a",marginTop:2,fontStyle:"italic"}}>* {deal.notes}</div>}
-                      </div>
-                      <div style={{textAlign:"right",flexShrink:0}}>
-                        <div style={{fontFamily:"'Playfair Display',serif",fontSize:32,fontWeight:700,color:"#3d6b42",lineHeight:1}}>{deal.pct}%</div>
-                        <div style={{fontSize:10,color:"#3d6b42",letterSpacing:"1px",fontWeight:700}}>OFF</div>
-                      </div>
+
+            {/* Search input */}
+            <div style={{position:"relative",marginBottom:12}}>
+              <input className="inp" style={{paddingLeft:46,fontSize:15,paddingRight:90}}
+                placeholder="e.g. Wedding Cake, Animal Face..."
+                value={optQuery}
+                onChange={e=>setOptQuery(e.target.value)}
+                onKeyDown={e=>e.key==="Enter"&&runOptimizer()}
+              />
+              <span style={{position:"absolute",left:14,top:"50%",transform:"translateY(-50%)",fontSize:20,pointerEvents:"none"}}>🎯</span>
+              <button onClick={runOptimizer} style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"#c8f53c",border:"none",borderRadius:10,padding:"8px 16px",fontSize:13,fontWeight:700,color:"#0d1a0d",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>
+                Go
+              </button>
+            </div>
+
+            {/* Category + settings */}
+            <div style={{display:"flex",gap:6,overflowX:"auto",marginBottom:12,paddingBottom:2}}>
+              {OPT_CATS.map(c=>(
+                <button key={c} className={"pill"+(optCategory===c?" on":" off")} onClick={()=>setOptCategory(c)} style={{fontSize:11,padding:"5px 11px"}}>{c}</button>
+              ))}
+            </div>
+
+            <div style={{display:"flex",gap:8,marginBottom:20}}>
+              <select className="inp" value={customerType} onChange={e=>setCustomerType(e.target.value)}
+                style={{padding:"9px 12px",fontSize:12,flex:1}}>
+                {CUSTOMER_TYPES.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
+              </select>
+              <select className="inp" value={selectedDay} onChange={e=>setSelectedDay(parseInt(e.target.value))}
+                style={{padding:"9px 12px",fontSize:12,flex:1}}>
+                {DAYS.map((d,i)=><option key={i} value={i}>{d.slice(0,3)}{i===new Date().getDay()?" ✦":""}</option>)}
+              </select>
+              <button onClick={()=>setIsFirstTime(v=>!v)} style={{padding:"9px 12px",borderRadius:10,border:"1.5px solid "+(isFirstTime?"#c8f53c":"rgba(255,255,255,.12)"),background:isFirstTime?"rgba(200,245,60,.1)":"transparent",color:isFirstTime?"#c8f53c":"rgba(240,237,230,.4)",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",whiteSpace:"nowrap"}}>
+                {isFirstTime?"✓ 1st":"1st?"}
+              </button>
+              <button onClick={()=>setIsMedical(v=>!v)} style={{padding:"9px 12px",borderRadius:10,border:"1.5px solid "+(isMedical?"#c8f53c":"rgba(255,255,255,.12)"),background:isMedical?"rgba(200,245,60,.1)":"transparent",color:isMedical?"#c8f53c":"rgba(240,237,230,.4)",fontSize:12,fontWeight:700,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",whiteSpace:"nowrap"}}>
+                {isMedical?"✓ Med":"Med?"}
+              </button>
+            </div>
+
+            {/* Popular quick searches */}
+            {!optResults&&!optLoading&&(
+              <div>
+                <div style={{fontSize:11,color:"rgba(240,237,230,.25)",letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:10}}>Try searching</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                  {["Wedding Cake","Animal Face","Lemon Cherry Gelato","Gary Payton","Runtz","MAC","Ice Cream Cake","GMO","Jealousy","Blue Dream","Gelato 41","Duffle Full of Blues"].map(s=>(
+                    <button key={s} onClick={()=>{setOptQuery(s);}} className="pill off" style={{fontSize:11,padding:"5px 11px"}}>{s}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Loading */}
+            {optLoading&&(
+              <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                {[1,2,3].map(i=><div key={i} className="shimmer" style={{height:100,borderRadius:18}}/>)}
+              </div>
+            )}
+
+            {/* Results */}
+            {optResults&&!optLoading&&(
+              <div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
+                  <div>
+                    <div style={{fontFamily:"'DM Serif Display',serif",fontSize:20,color:"#f0ede6"}}>"{optQuery}"</div>
+                    <div style={{fontSize:12,color:"rgba(240,237,230,.35)",marginTop:2}}>
+                      {optResults.length>0
+                        ? `${optResults.length} result${optResults.length===1?"":"s"} · sorted by ${optResults.some(r=>r.ppg)?"price per gram":"final price"}`
+                        : "Not found in any NJ dispensary right now"}
                     </div>
                   </div>
-                ))}
+                  <button onClick={()=>{setOptResults(null);setOptQuery("");}} className="pill off" style={{fontSize:11}}>Clear</button>
+                </div>
+
+                {optResults.length===0?(
+                  <div style={{textAlign:"center",padding:"40px 0"}}>
+                    <div style={{fontSize:40,marginBottom:12}}>😔</div>
+                    <div style={{fontFamily:"'DM Serif Display',serif",fontSize:20,marginBottom:6}}>Not in stock</div>
+                    <div style={{fontSize:13,color:"rgba(240,237,230,.35)"}}>Try a different spelling or check the Explore tab for today's best deals</div>
+                  </div>
+                ):(
+                  <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                    {optResults.map((r,i)=>{
+                      const isWinner = i===0;
+                      const cat = r.cleanCat;
+                      const clr = catColor(cat);
+                      return (
+                        <div key={i} className="card" onClick={()=>openDispensary(r.dispensary_slug, r.dispName)}
+                          style={{padding:"16px 18px",borderColor:isWinner?"rgba(200,245,60,.4)":"rgba(200,245,60,.08)",
+                            background:isWinner?"linear-gradient(135deg,#1c3010,#162016)":"#162016"}}>
+                          <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+                            {/* Strain image */}
+                            <StrainImage
+                              name={r.name}
+                              imageUrl={r.image_url}
+                              size={52}
+                            />
+                            {/* Rank */}
+                            <div style={{width:28,flexShrink:0,paddingTop:2}}>
+                              <div style={{fontFamily:"'DM Serif Display',serif",fontSize:22,color:isWinner?"#c8f53c":"rgba(240,237,230,.2)",lineHeight:1,textAlign:"center"}}>
+                                {isWinner?"🏆":`#${i+1}`}
+                              </div>
+                            </div>
+
+                            {/* Info */}
+                            <div style={{flex:1,minWidth:0}}>
+                              <div style={{fontSize:14,fontWeight:700,color:"#f0ede6",marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.name}</div>
+                              <div style={{fontSize:13,color:"rgba(240,237,230,.55)",marginBottom:4,fontWeight:500}}>{r.dispName}</div>
+                              <div style={{display:"flex",gap:6,flexWrap:"wrap",alignItems:"center"}}>
+                                <span style={{fontSize:10,padding:"2px 8px",background:clr+"25",color:clr,borderRadius:20,fontWeight:700,border:"1px solid "+clr+"40"}}>{cat}</span>
+                                {r.weight_grams&&<span style={{fontSize:11,color:"rgba(240,237,230,.4)",fontWeight:600}}>{r.weight_grams}g</span>}
+                                {r.thc_pct&&<span style={{fontSize:11,color:"#c8f53c",fontWeight:700}}>THC {r.thc_pct}%</span>}
+                                {r.brand&&<span style={{fontSize:10,color:"rgba(240,237,230,.3)"}}>by {r.brand}</span>}
+                              </div>
+                              {r.bestDealName&&(
+                                <div style={{fontSize:11,color:"rgba(200,245,60,.6)",marginTop:5,fontWeight:600}}>🏷 {r.bestDealName} (-{r.bestDiscount}%)</div>
+                              )}
+                              <div style={{fontSize:10,color:"rgba(240,237,230,.25)",marginTop:3}}>{r.dispCity} · {r.dispCounty} Co.</div>
+                            </div>
+
+                            {/* Price block */}
+                            <div style={{textAlign:"right",flexShrink:0,minWidth:80}}>
+                              {r.ppg?(
+                                <div>
+                                  <div style={{fontFamily:"'DM Serif Display',serif",fontSize:26,color:isWinner?"#c8f53c":"#f0ede6",lineHeight:1}}>${r.ppg.toFixed(2)}</div>
+                                  <div style={{fontSize:10,color:"rgba(240,237,230,.35)",fontWeight:600,marginTop:1}}>/gram</div>
+                                  {r.bestDiscount>0&&<div style={{fontSize:10,color:"rgba(240,237,230,.3)",textDecoration:"line-through",marginTop:2}}>${r.price_usd?.toFixed(2)}</div>}
+                                  {r.finalPrice&&<div style={{fontSize:12,color:"rgba(240,237,230,.5)",marginTop:1}}>${r.finalPrice} total</div>}
+                                </div>
+                              ):r.finalPrice?(
+                                <div>
+                                  <div style={{fontFamily:"'DM Serif Display',serif",fontSize:26,color:isWinner?"#c8f53c":"#f0ede6",lineHeight:1}}>${r.finalPrice}</div>
+                                  <div style={{fontSize:10,color:"rgba(240,237,230,.35)",marginTop:1}}>after tax</div>
+                                </div>
+                              ):(
+                                <div style={{fontSize:11,color:"rgba(240,237,230,.2)",marginTop:4}}>Price TBD</div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>
         )}
 
-        {/* DEAL CALCULATOR TAB */}
-        {tab==="calculator"&&(
-          <div className="fade">
-            <div style={{fontFamily:"'Playfair Display',serif",fontSize:22,fontWeight:700,marginBottom:6}}>Deal + Tax Calculator</div>
-            <div style={{fontSize:13,color:"#9a9a8a",marginBottom:24}}>Real out-of-pocket price after every discount and tax.</div>
-            <div style={{display:"grid",gridTemplateColumns:"280px 1fr",gap:24,alignItems:"start"}}>
-              <div className="card" style={{padding:18,position:"sticky",top:100}}>
-                <div style={{fontSize:10,color:"#9a9a8a",letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:12,fontWeight:700}}>Settings</div>
-                <div style={{fontSize:11,color:"#5a5a5a",marginBottom:4}}>Day of week</div>
-                <select className="inp" value={selectedDay} onChange={e=>setSelectedDay(parseInt(e.target.value))} style={{marginBottom:10}}>
-                  {DAYS.map((d,i)=><option key={i} value={i}>{d}{i===new Date().getDay()?" (Today)":""}</option>)}
-                </select>
-                <div style={{fontSize:11,color:"#5a5a5a",marginBottom:4}}>Customer type</div>
-                <select className="inp" value={customerType} onChange={e=>setCustomerType(e.target.value)} style={{marginBottom:10}}>
-                  {CUSTOMER_TYPES.map(t=><option key={t.id} value={t.id}>{t.label}</option>)}
-                </select>
-                <div style={{fontSize:11,color:"#5a5a5a",marginBottom:4}}>Category</div>
-                <select className="inp" value={selectedCat} onChange={e=>setSelectedCat(e.target.value)} style={{marginBottom:10}}>
-                  {CATEGORIES.filter(c=>c!=="All").map(c=><option key={c}>{c}</option>)}
-                </select>
-                <div style={{fontSize:11,color:"#5a5a5a",marginBottom:4}}>Weight</div>
-                <select className="inp" value={selectedWeight} onChange={e=>setSelectedWeight(e.target.value)} style={{marginBottom:10}}>
-                  {WEIGHTS.map(w=><option key={w.label} value={w.label}>{w.label}</option>)}
-                </select>
-                <div className={"cbx"+(isFirstTime?" on":"")} onClick={()=>setIsFirstTime(v=>!v)} style={{marginBottom:6}}>
-                  <div style={{width:18,height:18,borderRadius:4,border:"2px solid "+(isFirstTime?"#6a9e6f":"#ddd8cc"),background:isFirstTime?"#6a9e6f":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    {isFirstTime&&<span style={{color:"#fff",fontSize:11}}>✓</span>}
-                  </div>
-                  <div style={{fontSize:12,fontWeight:700,color:isFirstTime?"#3d6b42":"#2c2c2c"}}>First-time customer</div>
-                </div>
-                <div className={"cbx"+(isMedical?" on":"")} onClick={()=>setIsMedical(v=>!v)}>
-                  <div style={{width:18,height:18,borderRadius:4,border:"2px solid "+(isMedical?"#6a9e6f":"#ddd8cc"),background:isMedical?"#6a9e6f":"#fff",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
-                    {isMedical&&<span style={{color:"#fff",fontSize:11}}>✓</span>}
-                  </div>
-                  <div style={{fontSize:12,fontWeight:700,color:isMedical?"#3d6b42":"#2c2c2c"}}>Medical patient (tax-free)</div>
-                </div>
-              </div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:14}}>
-                {allRows.map((d,i)=>{
-                  const taxRate = getTaxRate(d.city,isMedical);
-                  return (
-                    <div key={d.slug} className="card" style={{padding:20,border:"1.5px solid "+(i===0?"#b8d4bb":"#ddd8cc"),background:i===0?"linear-gradient(135deg,#eef8f2,#fff)":"#fff"}}>
-                      {i===0&&<div style={{fontSize:10,color:"#3d6b42",fontWeight:700,letterSpacing:"1px",marginBottom:6}}>✦ BEST DEAL TODAY</div>}
-                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:15,fontWeight:700,marginBottom:2}}>{d.name}</div>
-                      <div style={{fontSize:11,color:"#9a9a8a",marginBottom:10}}>{d.city} . {d.county} Co.</div>
-                      <div style={{background:"#f7f5f0",borderRadius:8,padding:"12px 14px",marginBottom:10}}>
-                        <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#5a5a5a",marginBottom:4}}>
-                          <span>Base price</span><span>${d.basePrice.toFixed(2)}</span>
-                        </div>
-                        {d.bestDiscount>0&&(
-                          <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#3d6b42",marginBottom:4}}>
-                            <span>🏷 Best deal: {d.bestDealName}</span>
-                            <span>-${(d.basePrice-d.discountedPrice).toFixed(2)}</span>
-                          </div>
-                        )}
-                        <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#9a9a8a",marginBottom:4}}>
-                          <span>📍 {isMedical?"Medical (tax-free)":getTaxLabel(d.city,isMedical)}</span>
-                          <span>{isMedical?"$0.00":"+$"+d.taxAmount.toFixed(2)}</span>
-                        </div>
-                        <div style={{borderTop:"1px solid #ddd8cc",paddingTop:8,marginTop:4,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-                          <span style={{fontSize:13,fontWeight:700}}>You pay</span>
-                          <span style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:700,color:i===0?"#3d6b42":"#2c2c2c"}}>${d.finalPrice.toFixed(2)}</span>
-                        </div>
-                      </div>
-                      {d.bestDiscount>0?(
-                        <div style={{fontSize:11,color:"#3d6b42",fontWeight:700}}>🎉 You save ${(d.basePrice-d.discountedPrice).toFixed(2)} ({d.bestDiscount}% off)</div>
-                      ):(
-                        <div style={{fontSize:11,color:"#9a9a8a"}}>No deals {DAYS[selectedDay]}</div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* FIND A STRAIN TAB */}
-        {tab==="finder"&&(
-          <div className="fade">
-            <div style={{maxWidth:700,margin:"0 auto"}}>
-              <div style={{textAlign:"center",marginBottom:32}}>
-                <div style={{fontFamily:"'Playfair Display',serif",fontSize:26,fontWeight:700,marginBottom:8}}>Find a Strain</div>
-                <div style={{fontSize:13,color:"#9a9a8a"}}>Search across every NJ dispensary. See who has it, at what price, after your discount and tax.</div>
-              </div>
-              <div style={{position:"relative",marginBottom:24}}>
-                <div style={{position:"absolute",left:16,top:"50%",transform:"translateY(-50%)",fontSize:18,pointerEvents:"none"}}>🔍</div>
-                <input className="inp" style={{paddingLeft:46,fontSize:15,padding:"14px 16px 14px 46px",borderRadius:12,border:"2px solid #ddd8cc"}}
-                  placeholder="e.g. Duffle Full of Blues, Animal Face, Wedding Cake..."
-                  value={strainQuery}
-                  onChange={e=>setStrainQuery(e.target.value)}
-                  onKeyDown={e=>e.key==="Enter"&&doStrainSearch()}
-                />
-                <button onClick={doStrainSearch} style={{position:"absolute",right:8,top:"50%",transform:"translateY(-50%)",background:"linear-gradient(135deg,#6a9e6f,#3d6b42)",color:"#fff",border:"none",borderRadius:8,padding:"8px 18px",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"'Lato',sans-serif"}}>Search</button>
-              </div>
-              {!strainResults&&!strainLoading&&(
-                <div>
-                  <div style={{fontSize:11,color:"#9a9a8a",letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:12,fontWeight:700}}>Popular in NJ right now</div>
-                  <div style={{display:"flex",flexWrap:"wrap",gap:8,marginBottom:32}}>
-                    {["Duffle Full of Blues","Animal Face","Wedding Cake","Lemon Cherry Gelato","Gary Payton","Runtz","MAC","Ice Cream Cake","GMO","Jealousy","Zkittlez","Blue Dream","Gelato 41"].map(s=>(
-                      <button key={s} onClick={()=>setStrainQuery(s)} className="sel-btn" style={{fontSize:12,padding:"6px 14px"}}>{s}</button>
-                    ))}
-                  </div>
-                  <div style={{textAlign:"center",padding:"40px 20px",background:"#fff",borderRadius:16,border:"1.5px dashed #ddd8cc"}}>
-                    <div style={{fontSize:40,marginBottom:12}}>🔍</div>
-                    <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,marginBottom:6}}>Search any strain</div>
-                    <div style={{fontSize:13,color:"#9a9a8a",maxWidth:400,margin:"0 auto",lineHeight:1.6}}>See every NJ dispensary with it in stock, priced after your discount and tax. Updated every 30 minutes.</div>
-                  </div>
-                </div>
-              )}
-              {strainLoading&&(
-                <div style={{textAlign:"center",padding:60}}>
-                  <div style={{fontSize:32,marginBottom:12}}>🔍</div>
-                  <div style={{fontFamily:"'Playfair Display',serif",fontSize:16,color:"#9a9a8a"}}>Searching all NJ dispensaries...</div>
-                </div>
-              )}
-              {strainResults&&!strainLoading&&(
-                <div>
-                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
-                    <div>
-                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700}}>"{strainQuery}"</div>
-                      <div style={{fontSize:12,color:"#9a9a8a",marginTop:2}}>{strainResults.length>0?`Found at ${strainResults.length} dispensar${strainResults.length===1?"y":"ies"} in NJ`:"Not found anywhere right now"}</div>
-                    </div>
-                    <button onClick={()=>{setStrainResults(null);setStrainQuery("");}} style={{background:"none",border:"1.5px solid #ddd8cc",borderRadius:8,padding:"6px 14px",fontSize:12,color:"#9a9a8a",cursor:"pointer",fontFamily:"'Lato',sans-serif"}}>← New search</button>
-                  </div>
-                  {strainResults.length===0?(
-                    <div style={{textAlign:"center",padding:"40px 20px",background:"#fff",borderRadius:16,border:"1.5px solid #ddd8cc"}}>
-                      <div style={{fontSize:36,marginBottom:12}}>😔</div>
-                      <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,marginBottom:6}}>Not in stock anywhere right now</div>
-                      <div style={{fontSize:13,color:"#9a9a8a"}}>Check back -- menus update every 30 minutes.</div>
-                    </div>
-                  ):(
-                    <div style={{display:"flex",flexDirection:"column",gap:10}}>
-                      {strainResults.sort((a,b)=>(a.price*(1+getTaxRate(a.city)))-(b.price*(1+getTaxRate(b.city)))).map((r,i)=>{
-                        const deal = getBestDeal(r.slug,r.price,{dayOfWeek:selectedDay,customerType:isFirstTime?"first-time":customerType,category:r.category,isFirstTime});
-                        const taxRate = getTaxRate(r.city,isMedical);
-                        const finalPrice = (deal.discountedPrice*(1+taxRate)).toFixed(2);
-                        const best = i===0;
-                        return (
-                          <div key={i} className={"prow"+(best?" best":"")} style={{padding:"16px 20px",background:best?"linear-gradient(135deg,#eef8f2,#fff)":"#fff",border:"1.5px solid "+(best?"#b8d4bb":"#ddd8cc")}}>
-                            <div style={{width:24,fontFamily:"'Playfair Display',serif",fontSize:13,fontWeight:700,color:best?"#3d6b42":"#9a9a8a",flexShrink:0}}>#{i+1}</div>
-                            <div style={{flex:1,minWidth:0}}>
-                              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:2,flexWrap:"wrap"}}>
-                                <span style={{fontSize:14,fontWeight:700}}>{r.dispensary}</span>
-                                <span style={{fontSize:11,padding:"2px 8px",background:r.category==="Flower"?"#eef8f2":"#f5f0fc",color:r.category==="Flower"?"#3d6b42":"#7b5ea7",borderRadius:20,fontWeight:700}}>{r.category}</span>
-                                {best&&<span style={{fontSize:10,padding:"2px 8px",background:"#3d6b42",color:"#fff",borderRadius:20,fontWeight:700}}>BEST PRICE</span>}
-                              </div>
-                              <div style={{fontSize:12,color:"#9a9a8a",marginBottom:4}}>{r.city} . {r.county} Co. . {r.weight}</div>
-                              <div style={{display:"flex",gap:12,flexWrap:"wrap"}}>
-                                {r.thc&&<span style={{fontSize:11,color:"#5a5a5a",fontWeight:700}}>THC {r.thc}%</span>}
-                                {r.brand&&<span style={{fontSize:11,color:"#9a9a8a"}}>by {r.brand}</span>}
-                                {deal.bestDealName&&<span style={{fontSize:11,color:"#c8a96e",fontWeight:700}}>🏷 {deal.bestDealName} -- {deal.bestDiscount}% off</span>}
-                              </div>
-                            </div>
-                            <div style={{textAlign:"right",flexShrink:0,minWidth:100}}>
-                              {deal.bestDiscount>0&&<div style={{fontSize:11,color:"#9a9a8a",textDecoration:"line-through"}}>${r.price.toFixed(2)}</div>}
-                              <div style={{fontFamily:"'Playfair Display',serif",fontSize:26,fontWeight:700,color:best?"#3d6b42":"#2c2c2c",lineHeight:1}}>${finalPrice}</div>
-                              <div style={{fontSize:9,color:"#9a9a8a",marginTop:2}}>after tax</div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* STRAIN LIBRARY TAB */}
-        {tab==="strains"&&(
-          <div className="fade" style={{textAlign:"center",padding:"60px 20px"}}>
-            <div style={{fontSize:40,marginBottom:16}}>🌱</div>
-            <div style={{fontFamily:"'Playfair Display',serif",fontSize:24,fontWeight:700,marginBottom:8}}>Strain Library</div>
-            <div style={{fontSize:13,color:"#9a9a8a",maxWidth:400,margin:"0 auto"}}>Full strain database with effects, terpenes, and where to find each strain in NJ. Coming soon -- use Find a Strain in the meantime.</div>
-          </div>
-        )}
-
       </div>
 
-      {showPricing&&(
-        <PricingModal onSelect={(t)=>{setTier(t);setShowPricing(false);}} onClose={()=>setShowPricing(false)} currentTier={tier}/>
-      )}
-
       {/* DISPENSARY PRODUCT MODAL */}
-      {dispModalOpen&&selectedDisp&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.5)",display:"flex",alignItems:"flex-end",justifyContent:"center",zIndex:500}}
-          onClick={e=>e.target===e.currentTarget&&setDispModalOpen(false)}>
-          <div style={{background:"#fff",borderRadius:"20px 20px 0 0",width:"100%",maxWidth:700,maxHeight:"85vh",overflowY:"auto",padding:"24px 24px 40px"}}>
-            {/* Handle bar */}
-            <div style={{width:40,height:4,background:"#ddd8cc",borderRadius:2,margin:"0 auto 20px"}}/>
-            
-            {/* Header */}
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:20}}>
-              <div>
-                <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,marginBottom:2}}>{selectedDisp.name}</div>
-                <div style={{fontSize:12,color:"#9a9a8a"}}>{selectedDisp.city} · {selectedDisp.county} County</div>
-                {selectedDisp.bestDealName&&(
-                  <div style={{fontSize:12,color:"#c8a96e",fontWeight:700,marginTop:4}}>🏷 {selectedDisp.bestDealName} — {selectedDisp.bestDiscount}% off today</div>
-                )}
-              </div>
-              <button onClick={()=>setDispModalOpen(false)}
-                style={{background:"#f0ede6",border:"none",borderRadius:"50%",width:32,height:32,fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>
-                ✕
-              </button>
-            </div>
-
-            {dispLoading?(
-              <div style={{textAlign:"center",padding:40,color:"#9a9a8a"}}>Loading products...</div>
-            ):(
-              <div>
-                <div style={{fontSize:11,color:"#9a9a8a",letterSpacing:"1.5px",textTransform:"uppercase",marginBottom:12,fontWeight:700}}>
-                  {dispProducts.length} products in stock
+      {selectedDisp&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.75)",zIndex:200,display:"flex",alignItems:"flex-end"}}
+          onClick={e=>e.target===e.currentTarget&&setSelectedDisp(null)}>
+          <div className="slide" style={{background:"#0d1a0d",borderRadius:"22px 22px 0 0",width:"100%",maxHeight:"88vh",overflowY:"auto",border:"1px solid rgba(200,245,60,.12)",borderBottom:"none"}}>
+            <div style={{width:36,height:4,background:"rgba(255,255,255,.1)",borderRadius:2,margin:"14px auto 0"}}/>
+            <div style={{padding:"16px 20px",position:"sticky",top:0,background:"#0d1a0d",borderBottom:"1px solid rgba(200,245,60,.07)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                <div>
+                  <div style={{fontFamily:"'DM Serif Display',serif",fontSize:20,color:"#f0ede6",marginBottom:2}}>{selectedDisp.name}</div>
+                  <div style={{fontSize:12,color:"rgba(240,237,230,.35)"}}>{selectedDisp.city} · {selectedDisp.county} Co. · {dispProducts.length} products</div>
                 </div>
+                <button onClick={()=>setSelectedDisp(null)} style={{background:"rgba(255,255,255,.07)",border:"none",borderRadius:"50%",width:32,height:32,color:"rgba(240,237,230,.5)",fontSize:16,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>✕</button>
+              </div>
+            </div>
+            <div style={{padding:"14px 16px 40px"}}>
+              {dispLoading?(
                 <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                  {[1,2,3,4,5].map(i=><div key={i} className="shimmer" style={{height:56,borderRadius:12}}/>)}
+                </div>
+              ):(
+                <div style={{display:"flex",flexDirection:"column",gap:5}}>
                   {dispProducts.map((p,i)=>{
-                    const catStr = (p.category||"").toLowerCase();
-                    const catLabel = catStr.includes("indica")?"Indica":catStr.includes("sativa")?"Sativa":catStr.includes("hybrid")?"Hybrid":catStr.includes("pre")?"Pre-Roll":catStr.includes("edible")?"Edible":catStr.includes("vape")?"Vape":catStr.includes("concentrate")?"Concentrate":"Other";
-                    const catColor = catStr.includes("indica")?"#7b5ea7":catStr.includes("sativa")?"#c8a96e":catStr.includes("hybrid")?"#6a9e6f":"#9a9a8a";
+                    const cat = cleanCategory(p.category);
+                    const clr = catColor(cat);
+                    const ppg = calcPPG(p.price_usd, p.weight_grams);
                     return (
-                      <div key={i} style={{display:"flex",alignItems:"center",gap:12,padding:"10px 14px",background:i%2===0?"#f7f5f0":"#fff",borderRadius:8}}>
+                      <div key={i} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:i%2===0?"#162016":"rgba(255,255,255,.02)",borderRadius:12}}>
+                        <StrainImage
+                          name={p.name}
+                          imageUrl={p.image_url}
+                          size={44}
+                        />
                         <div style={{flex:1,minWidth:0}}>
-                          <div style={{fontSize:13,fontWeight:700,marginBottom:2,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p.name}</div>
-                          <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap"}}>
-                            <span style={{fontSize:10,padding:"2px 8px",background:catColor+"22",color:catColor,borderRadius:20,fontWeight:700}}>{catLabel}</span>
-                            {p.brand&&<span style={{fontSize:10,color:"#9a9a8a"}}>by {p.brand}</span>}
-                            {p.thc_pct&&<span style={{fontSize:10,color:"#5a5a5a",fontWeight:700}}>THC {p.thc_pct}%</span>}
-                            {p.weight_grams&&<span style={{fontSize:10,color:"#9a9a8a"}}>{p.weight_grams}g</span>}
+                          <div style={{fontSize:13,fontWeight:600,color:"#f0ede6",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",marginBottom:3}}>{p.name}</div>
+                          <div style={{display:"flex",gap:5,flexWrap:"wrap",alignItems:"center"}}>
+                            <span style={{fontSize:9,padding:"1px 7px",background:clr+"20",color:clr,borderRadius:20,fontWeight:700}}>{cat}</span>
+                            {p.weight_grams&&<span style={{fontSize:10,color:"rgba(240,237,230,.35)"}}>{p.weight_grams}g</span>}
+                            {p.thc_pct&&<span style={{fontSize:10,color:"#c8f53c",fontWeight:700}}>{p.thc_pct}% THC</span>}
+                            {p.brand&&<span style={{fontSize:9,color:"rgba(240,237,230,.25)"}}>by {p.brand}</span>}
                           </div>
+                          {p.description&&p.description.length>5&&(
+                            <div style={{fontSize:11,color:"rgba(240,237,230,.25)",marginTop:3,overflow:"hidden",display:"-webkit-box",WebkitLineClamp:1,WebkitBoxOrient:"vertical"}}>{p.description}</div>
+                          )}
                         </div>
                         <div style={{textAlign:"right",flexShrink:0}}>
                           {p.price_usd>1?(
-                            <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:"#2c2c2c"}}>${p.price_usd.toFixed(2)}</div>
+                            <div>
+                              <div style={{fontFamily:"'DM Serif Display',serif",fontSize:18,color:"#f0ede6"}}>${p.price_usd.toFixed(2)}</div>
+                              {ppg&&<div style={{fontSize:10,color:"rgba(200,245,60,.5)",fontWeight:600}}>${ppg.toFixed(2)}/g</div>}
+                            </div>
                           ):(
-                            <div style={{fontSize:11,color:"#c8a96e",fontWeight:700}}>Price TBD</div>
+                            <div style={{fontSize:11,color:"rgba(240,237,230,.15)"}}>—</div>
                           )}
                         </div>
                       </div>
                     );
                   })}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       )}
 
+      {/* PRICING MODAL */}
+      {showPricing&&(
+        <PricingModal onSelect={(t)=>{setTier(t);setShowPricing(false);}} onClose={()=>setShowPricing(false)} currentTier={tier}/>
+      )}
+
+      {/* ADMIN LOGIN */}
       {showAdminLogin&&(
-        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.7)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000}}>
-          <div style={{background:"#1a1a1a",border:"1px solid #333",borderRadius:16,padding:"32px 28px",width:"100%",maxWidth:360,boxShadow:"0 24px 64px rgba(0,0,0,.6)"}}>
-            <div style={{textAlign:"center",marginBottom:20}}>
-              <div style={{fontSize:28,marginBottom:8}}>🔐</div>
-              <div style={{fontFamily:"'Playfair Display',serif",fontSize:18,fontWeight:700,color:"#fff",marginBottom:4}}>Admin Access</div>
-              <div style={{fontSize:12,color:"#666"}}>FindWeedNJ Business Dashboard</div>
+        <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.85)",display:"flex",alignItems:"center",justifyContent:"center",zIndex:2000,padding:20}}>
+          <div style={{background:"#162016",border:"1px solid rgba(200,245,60,.2)",borderRadius:20,padding:"32px 24px",width:"100%",maxWidth:340}}>
+            <div style={{textAlign:"center",marginBottom:18}}>
+              <div style={{fontFamily:"'DM Serif Display',serif",fontSize:20,color:"#f0ede6",marginBottom:4}}>🔐 Admin</div>
             </div>
-            <input type="password" placeholder="Enter admin password" value={adminPass}
+            <input type="password" placeholder="Password" value={adminPass}
               onChange={e=>{setAdminPass(e.target.value);setAdminErr(false);}}
               onKeyDown={e=>e.key==="Enter"&&doAdminLogin()}
-              style={{width:"100%",background:"#2a2a2a",border:"1.5px solid "+(adminErr?"#e07b6a":"#444"),color:"#fff",padding:"11px 14px",borderRadius:8,fontSize:14,fontFamily:"'Lato',sans-serif",outline:"none",marginBottom:8}}
-              autoFocus
+              className="inp" style={{marginBottom:8}} autoFocus
             />
-            {adminErr&&<div style={{fontSize:12,color:"#e07b6a",marginBottom:8,textAlign:"center"}}>Incorrect password</div>}
+            {adminErr&&<div style={{fontSize:12,color:"#ff6b6b",marginBottom:8,textAlign:"center"}}>Wrong password</div>}
             <div style={{display:"flex",gap:8}}>
-              <button onClick={doAdminLogin} style={{flex:1,padding:"11px",background:"linear-gradient(135deg,#6a9e6f,#3d6b42)",border:"none",borderRadius:8,color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'Lato',sans-serif"}}>Enter</button>
-              <button onClick={()=>{setShowAdminLogin(false);setAdminPass("");setAdminErr(false);}} style={{padding:"11px 16px",background:"#2a2a2a",border:"1px solid #444",borderRadius:8,color:"#888",fontSize:14,cursor:"pointer",fontFamily:"'Lato',sans-serif"}}>Cancel</button>
+              <button onClick={doAdminLogin} style={{flex:1,padding:"12px",background:"#c8f53c",border:"none",borderRadius:10,color:"#0d1a0d",fontSize:14,fontWeight:700,cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Enter</button>
+              <button onClick={()=>{setShowAdminLogin(false);setAdminPass("");setAdminErr(false);}} style={{padding:"12px 16px",background:"rgba(255,255,255,.05)",border:"1px solid rgba(255,255,255,.08)",borderRadius:10,color:"rgba(240,237,230,.4)",cursor:"pointer",fontFamily:"'DM Sans',sans-serif"}}>Cancel</button>
             </div>
-            <div style={{textAlign:"center",marginTop:12,fontSize:11,color:"#555"}}>Ctrl+Shift+A or type "admin" anywhere</div>
           </div>
         </div>
       )}
 
+      {/* ADMIN PANEL */}
       {showAdmin&&(
         <div style={{position:"fixed",inset:0,background:"#f0ede6",zIndex:1000,overflowY:"auto"}}>
           <AdminPanel onClose={()=>setShowAdmin(false)}/>
