@@ -1314,13 +1314,13 @@ function strainToSlug(name) {
 }
 
 function StrainImage({ name, imageUrl, size = 56, style = {} }) {
-  const [src, setSrc] = React.useState(
+  const [src, setSrc] = useState(
     imageUrl && imageUrl.length > 5 ? imageUrl :
     `https://cdn.leafly.com/strains/${strainToSlug(name)}.jpg`
   );
-  const [failed, setFailed] = React.useState(false);
+  const [failed, setFailed] = useState(false);
 
-  const fallbackColor = React.useMemo(() => {
+  const fallbackColor = useMemo(() => {
     const colors = ["#1e3a1e","#2a3a1a","#1a2e2e","#2e1a2e","#3a2a1a"];
     let hash = 0;
     for (let c of (name||"")) hash = c.charCodeAt(0) + ((hash<<5)-hash);
